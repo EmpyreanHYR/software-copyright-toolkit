@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,7 +24,7 @@ LINES_PER_PAGE = 50
 FRONT_BACK_PAGES = 30
 FRONT_BACK_LINES = LINES_PER_PAGE * FRONT_BACK_PAGES
 IDENTIFICATION_TOTAL_LINES = FRONT_BACK_LINES * 2
-MAX_WORD_LINE_CHARS = 92
+MAX_WORD_LINE_WIDTH = 80
 MODULE_END_PATTERNS = (
     re.compile(r"^\s*[}\])]+[;,\])}]*\s*$"),
     re.compile(r"^\s*};?\s*$"),
@@ -73,7 +74,7 @@ def collect_source_lines(target: Path) -> tuple[list[SourceLine], list[SkippedFi
         rel = str(path.relative_to(target)).replace("\\", "/")
         lines.append(SourceLine(f"===== 文件: {rel} =====", counts_as_source=False, is_source_text=False))
         lines.extend(
-            SourceLine(line, counts_as_source=True, is_source_text=True)
+            SourceLine(line.expandtabs(4), counts_as_source=True, is_source_text=True)
             for line in text.splitlines()
             if line.strip()
         )
@@ -137,11 +138,11 @@ def generate_identification_documents(
 def wrap_source_lines(lines: list[SourceLine]) -> list[SourceLine]:
     wrapped: list[SourceLine] = []
     for line in lines:
-        if len(line.text) <= MAX_WORD_LINE_CHARS:
+        if display_width(line.text) <= MAX_WORD_LINE_WIDTH:
             wrapped.append(line)
             continue
 
-        parts = split_long_line(line.text, MAX_WORD_LINE_CHARS)
+        parts = split_long_line(line.text, MAX_WORD_LINE_WIDTH)
         for index, part in enumerate(parts):
             wrapped.append(
                 SourceLine(
@@ -154,7 +155,29 @@ def wrap_source_lines(lines: list[SourceLine]) -> list[SourceLine]:
 
 
 def split_long_line(line: str, width: int) -> list[str]:
-    return [line[index : index + width] for index in range(0, len(line), width)] or [line]
+    parts: list[str] = []
+    current: list[str] = []
+    current_width = 0
+
+    for char in line:
+        char_width = display_width(char)
+        if current and current_width + char_width > width:
+            parts.append("".join(current))
+            current = []
+            current_width = 0
+        current.append(char)
+        current_width += char_width
+
+    if current:
+        parts.append("".join(current))
+    return parts or [line]
+
+
+def display_width(text: str) -> int:
+    width = 0
+    for char in text:
+        width += 2 if unicodedata.east_asian_width(char) in {"F", "W"} else 1
+    return width
 
 
 def select_identification_lines(lines: list[SourceLine], source_content_line_count: int) -> list[SourceLine]:

@@ -21,8 +21,10 @@ Thumbs.db
 # Local input folders used during development
 /Project_scholarship3.0/
 /UT-VirtualLab/
+/test/
 
 # Generated root-level reports; keep project documentation tracked.
+/.tmp-*/
 /*.md
 /*.docx
 !/README.md
