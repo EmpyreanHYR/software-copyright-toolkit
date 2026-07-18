@@ -1,13 +1,13 @@
 [project]
-name = "count-code"
+name = "software-copyright-toolkit"
 version = "0.1.0"
-description = "Count total, effective, blank, and comment lines for source files."
+description = "Toolkit for code line auditing and software copyright documentation preparation."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.scripts]
-count-code = "count_code:main"
+count-code = "software_copyright_toolkit:main"
 
 [build-system]
 requires = ["uv_build>=0.9.0,<0.12.0"]
