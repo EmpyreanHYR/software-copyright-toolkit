@@ -1,0 +1,27 @@
+# Python / uv
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local input folders used during development
+/Project_scholarship3.0/
+/UT-VirtualLab/
+
+# Generated root-level reports; keep project documentation tracked.
+/*.md
+!/README.md
