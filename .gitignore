@@ -24,4 +24,5 @@ Thumbs.db
 
 # Generated root-level reports; keep project documentation tracked.
 /*.md
+/*.docx
 !/README.md

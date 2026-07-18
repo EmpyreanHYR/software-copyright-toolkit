@@ -2,7 +2,7 @@
 
 统计指定文件夹内所有已适配代码文件的总行数、有效行数、空行数和注释行数，并在当前目录生成与目标文件夹同名的 Markdown 报告。
 
-本工具当前聚焦代码行数统计，后续可继续扩展为软著申请所需的程序鉴别文档整理工具。
+本工具用于代码行数统计，以及生成软著申请常用的程序鉴别材料。
 
 ## 1. 安装 uv
 
@@ -76,6 +76,8 @@ Linux / macOS:
 uv run count-code "/path/to/your/folder"
 ```
 
+`count-code` 和 `sct-cli` 是同一个命令入口。后续如果打包为命令行 exe，可以使用 `sct-cli` 作为更通用的名称。
+
 运行完成后，会在当前目录生成与目标文件夹同名的 Markdown 报告：
 
 Windows 示例：
@@ -90,7 +92,106 @@ Linux / macOS 示例：
 /home/your-name/count-code/folder.md
 ```
 
-## 5. 指定报告输出目录
+## 5. 命令行生成软著材料
+
+如果希望在命令行中同时生成代码行数统计、程序鉴别材料 Word、全量代码 Word，可以执行：
+
+Windows PowerShell:
+
+```powershell
+uv run sct-cli "D:\path\to\your\folder" --generate-docx --software-name "软件名称" --software-version "V1.0"
+```
+
+Linux / macOS:
+
+```bash
+uv run sct-cli "/path/to/your/folder" --generate-docx --software-name "软件名称" --software-version "V1.0"
+```
+
+指定输出目录：
+
+```bash
+uv run sct-cli "/path/to/your/folder" --output-dir "/path/to/reports" --generate-docx --software-name "软件名称" --software-version "V1.0"
+```
+
+命令行会生成：
+
+- `目标文件夹名.md`
+- `软件名称_版本号_程序鉴别材料_前后30页.docx`
+- `软件名称_版本号_程序鉴别材料_全量代码.docx`
+
+## 6. 打开图形界面
+
+如果需要生成软著申请用的程序鉴别材料，运行：
+
+```bash
+uv run sct-gui
+```
+
+也可以使用启动脚本自动检查环境并打开 GUI：
+
+推荐直接使用根目录启动器：
+
+- Windows: 双击 `open-gui.bat`
+- macOS: 双击 `open-gui.command`，或在终端中执行 `sh ./open-gui.command`
+- Linux: 在终端中执行 `sh ./launchers/open-gui.sh`
+
+也可以手动在终端运行：
+
+Windows:
+
+```powershell
+.\launchers\open-gui.bat
+```
+
+PowerShell:
+
+```powershell
+.\launchers\open-gui.ps1
+```
+
+Linux:
+
+```bash
+sh ./launchers/open-gui.sh
+```
+
+macOS:
+
+```bash
+sh ./launchers/open-gui.command
+```
+
+启动脚本会自动定位项目目录，检查本机是否安装 `uv`。如果没有安装，会先询问是否安装；选择拒绝会直接退出。检测到 `uv` 后，会使用清华源执行依赖同步：
+
+```bash
+uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+依赖环境准备完成后，会自动打开 GUI。
+
+界面支持：
+
+- 选择目标代码文件夹
+- 选择输出目录
+- 输入软件名称
+- 输入版本号
+- 可选生成代码行数统计 Markdown
+- 可选生成程序鉴别材料 Word
+- 可选生成全量代码 Word
+
+程序鉴别材料 Word 使用 Arial 字体、10 号字，左页眉为软件名称和版本号，右页眉为页码，页脚居中为当前页 / 总页数。
+
+生成的 Word 文件包括：
+
+- `软件名称_版本号_程序鉴别材料_前后30页.docx`
+- `软件名称_版本号_程序鉴别材料_全量代码.docx`
+
+当源码超过 60 页时，程序鉴别材料取前 30 页和后 30 页合并为一个 Word；当源码不足 60 页时，程序鉴别材料使用全部源码。
+
+Word 材料会去除空行，不插入手动分页符，内容按源码顺序连续排版。
+
+## 7. 指定报告输出目录
 
 默认报告输出到当前命令所在目录。也可以用 `--output-dir` 指定输出目录：
 

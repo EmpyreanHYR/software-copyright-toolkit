@@ -1,0 +1,224 @@
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+from docx import Document
+from docx.enum.section import WD_SECTION
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt
+
+from software_copyright_toolkit import (
+    SkippedFile,
+    count_supported_file,
+    iter_files,
+    read_text_lossless,
+)
+
+
+LINES_PER_PAGE = 50
+FRONT_BACK_PAGES = 30
+FRONT_BACK_LINES = LINES_PER_PAGE * FRONT_BACK_PAGES
+
+
+@dataclass(frozen=True)
+class GeneratedDocuments:
+    identification_docx: Path | None
+    full_docx: Path | None
+    source_line_count: int
+    identification_line_count: int
+
+
+def sanitize_filename(value: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", value).strip()
+    cleaned = re.sub(r"\s+", "_", cleaned)
+    return cleaned or "未命名软件"
+
+
+def collect_source_lines(target: Path) -> tuple[list[str], list[SkippedFile]]:
+    lines: list[str] = []
+    skipped: list[SkippedFile] = []
+
+    for path in sorted(iter_files(target), key=lambda item: str(item.relative_to(target)).lower()):
+        try:
+            text = read_text_lossless(path)
+        except (OSError, UnicodeError) as exc:
+            skipped.append(SkippedFile(path, f"读取失败或非文本文件: {exc}"))
+            continue
+
+        if count_supported_file(path, text) is None:
+            skipped.append(SkippedFile(path, f"未适配的文件后缀: {path.suffix.lower() or '(无后缀)'}"))
+            continue
+
+        rel = str(path.relative_to(target)).replace("\\", "/")
+        lines.append(f"===== 文件: {rel} =====")
+        lines.extend(line for line in text.splitlines() if line.strip())
+
+    return lines, skipped
+
+
+def generate_identification_documents(
+    target: Path,
+    output_dir: Path,
+    software_name: str,
+    version: str,
+    include_identification: bool = True,
+    include_full: bool = True,
+) -> GeneratedDocuments:
+    source_lines, _ = collect_source_lines(target)
+    if not source_lines:
+        raise ValueError("没有可用于生成程序鉴别材料的已适配代码文件。")
+    if not include_identification and not include_full:
+        raise ValueError("请至少选择一种 Word 材料。")
+
+    name_part = sanitize_filename(software_name)
+    version_part = sanitize_filename(version)
+    prefix = f"{name_part}_{version_part}_程序鉴别材料"
+
+    identification_path = output_dir / f"{prefix}_前后30页.docx" if include_identification else None
+    full_path = output_dir / f"{prefix}_全量代码.docx" if include_full else None
+    identification_lines = select_identification_lines(source_lines)
+
+    if identification_path is not None:
+        write_code_docx(
+            identification_path,
+            identification_lines,
+            software_name=software_name,
+            version=version,
+        )
+    if full_path is not None:
+        write_code_docx(
+            full_path,
+            source_lines,
+            software_name=software_name,
+            version=version,
+        )
+
+    return GeneratedDocuments(
+        identification_docx=identification_path,
+        full_docx=full_path,
+        source_line_count=len(source_lines),
+        identification_line_count=len(identification_lines),
+    )
+
+
+def select_identification_lines(lines: list[str]) -> list[str]:
+    max_lines = FRONT_BACK_LINES * 2
+    if len(lines) <= max_lines:
+        return lines
+    return lines[:FRONT_BACK_LINES] + lines[-FRONT_BACK_LINES:]
+
+
+def write_code_docx(path: Path, lines: list[str], software_name: str, version: str) -> None:
+    doc = Document()
+    setup_document(doc, software_name, version)
+
+    for line in lines:
+        paragraph = doc.add_paragraph()
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.line_spacing = 1
+        run = paragraph.add_run(line if line else " ")
+        apply_run_font(run)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(path)
+
+
+def setup_document(doc: Document, software_name: str, version: str) -> None:
+    enable_field_updates(doc)
+
+    normal = doc.styles["Normal"]
+    normal.font.name = "Arial"
+    normal.font.size = Pt(10)
+    normal._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
+
+    section = doc.sections[0]
+    section.start_type = WD_SECTION.NEW_PAGE
+    section.page_width = Cm(21)
+    section.page_height = Cm(29.7)
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2)
+    section.right_margin = Cm(2)
+    section.header_distance = Cm(1.2)
+    section.footer_distance = Cm(1.2)
+
+    setup_header(section, software_name, version)
+    setup_footer(section)
+
+
+def enable_field_updates(doc: Document) -> None:
+    settings = doc.settings._element
+    update_fields = settings.find(qn("w:updateFields"))
+    if update_fields is None:
+        update_fields = OxmlElement("w:updateFields")
+        settings.append(update_fields)
+    update_fields.set(qn("w:val"), "true")
+
+
+def setup_header(section, software_name: str, version: str) -> None:
+    header = section.header
+    paragraph = header.paragraphs[0]
+    clear_paragraph(paragraph)
+    paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(17), WD_TAB_ALIGNMENT.RIGHT)
+    paragraph.paragraph_format.space_after = Pt(0)
+
+    left_run = paragraph.add_run(f"{software_name} {version}")
+    apply_run_font(left_run)
+    tab_run = paragraph.add_run("\t")
+    apply_run_font(tab_run)
+    add_field(paragraph, "PAGE")
+
+
+def setup_footer(section) -> None:
+    footer = section.footer
+    paragraph = footer.paragraphs[0]
+    clear_paragraph(paragraph)
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.space_after = Pt(0)
+    add_field(paragraph, "PAGE")
+    slash_run = paragraph.add_run(" / ")
+    apply_run_font(slash_run)
+    add_field(paragraph, "NUMPAGES")
+
+
+def clear_paragraph(paragraph) -> None:
+    for child in list(paragraph._p):
+        paragraph._p.remove(child)
+
+
+def apply_run_font(run) -> None:
+    run.font.name = "Arial"
+    run.font.size = Pt(10)
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
+
+
+def add_field(paragraph, instruction: str) -> None:
+    run = paragraph.add_run()
+    apply_run_font(run)
+
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = f" {instruction} "
+
+    separate = OxmlElement("w:fldChar")
+    separate.set(qn("w:fldCharType"), "separate")
+
+    text = OxmlElement("w:t")
+    text.text = "1"
+
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+
+    run._r.append(begin)
+    run._r.append(instr)
+    run._r.append(separate)
+    run._r.append(text)
+    run._r.append(end)
