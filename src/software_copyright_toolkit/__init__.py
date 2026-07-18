@@ -359,8 +359,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"程序鉴别材料已生成: {documents.identification_docx}")
         print(f"全量代码 Word 已生成: {documents.full_docx}")
-        print(f"程序鉴别材料源行数: {documents.identification_line_count}")
-        print(f"全量代码源行数: {documents.source_line_count}")
+        print(f"程序鉴别材料 Word 可见行数: {documents.identification_line_count}")
+        print(f"程序鉴别材料有效代码及注释行数: {documents.identification_content_line_count}")
+        print(f"全量代码有效代码及注释行数: {documents.source_content_line_count}")
     return 0
 
 

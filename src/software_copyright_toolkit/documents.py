@@ -6,7 +6,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.section import WD_SECTION
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
@@ -22,6 +22,14 @@ from software_copyright_toolkit import (
 LINES_PER_PAGE = 50
 FRONT_BACK_PAGES = 30
 FRONT_BACK_LINES = LINES_PER_PAGE * FRONT_BACK_PAGES
+IDENTIFICATION_TOTAL_LINES = FRONT_BACK_LINES * 2
+MAX_WORD_LINE_CHARS = 92
+MODULE_END_PATTERNS = (
+    re.compile(r"^\s*[}\])]+[;,\])}]*\s*$"),
+    re.compile(r"^\s*};?\s*$"),
+    re.compile(r"^\s*end\s*[;,%#]*\s*$", re.IGNORECASE),
+    re.compile(r"^\s*end(?:function|class|methods|properties|for|if|while|switch)\b.*$", re.IGNORECASE),
+)
 
 
 @dataclass(frozen=True)
@@ -29,7 +37,9 @@ class GeneratedDocuments:
     identification_docx: Path | None
     full_docx: Path | None
     source_line_count: int
+    source_content_line_count: int
     identification_line_count: int
+    identification_content_line_count: int
 
 
 def sanitize_filename(value: str) -> str:
@@ -38,8 +48,15 @@ def sanitize_filename(value: str) -> str:
     return cleaned or "未命名软件"
 
 
-def collect_source_lines(target: Path) -> tuple[list[str], list[SkippedFile]]:
-    lines: list[str] = []
+@dataclass(frozen=True)
+class SourceLine:
+    text: str
+    counts_as_source: bool
+    is_source_text: bool
+
+
+def collect_source_lines(target: Path) -> tuple[list[SourceLine], list[SkippedFile]]:
+    lines: list[SourceLine] = []
     skipped: list[SkippedFile] = []
 
     for path in sorted(iter_files(target), key=lambda item: str(item.relative_to(target)).lower()):
@@ -54,8 +71,12 @@ def collect_source_lines(target: Path) -> tuple[list[str], list[SkippedFile]]:
             continue
 
         rel = str(path.relative_to(target)).replace("\\", "/")
-        lines.append(f"===== 文件: {rel} =====")
-        lines.extend(line for line in text.splitlines() if line.strip())
+        lines.append(SourceLine(f"===== 文件: {rel} =====", counts_as_source=False, is_source_text=False))
+        lines.extend(
+            SourceLine(line, counts_as_source=True, is_source_text=True)
+            for line in text.splitlines()
+            if line.strip()
+        )
 
     return lines, skipped
 
@@ -80,7 +101,10 @@ def generate_identification_documents(
 
     identification_path = output_dir / f"{prefix}_前后30页.docx" if include_identification else None
     full_path = output_dir / f"{prefix}_全量代码.docx" if include_full else None
-    identification_lines = select_identification_lines(source_lines)
+    source_content_line_count = count_source_content_lines(source_lines)
+    display_lines = wrap_source_lines(source_lines)
+    identification_lines = select_identification_lines(display_lines, source_content_line_count)
+    identification_content_line_count = count_source_content_lines(identification_lines)
 
     if identification_path is not None:
         write_code_docx(
@@ -88,11 +112,14 @@ def generate_identification_documents(
             identification_lines,
             software_name=software_name,
             version=version,
+            page_break_interval=LINES_PER_PAGE
+            if len(identification_lines) >= IDENTIFICATION_TOTAL_LINES
+            else None,
         )
     if full_path is not None:
         write_code_docx(
             full_path,
-            source_lines,
+            display_lines,
             software_name=software_name,
             version=version,
         )
@@ -100,29 +127,101 @@ def generate_identification_documents(
     return GeneratedDocuments(
         identification_docx=identification_path,
         full_docx=full_path,
-        source_line_count=len(source_lines),
+        source_line_count=len(display_lines),
+        source_content_line_count=source_content_line_count,
         identification_line_count=len(identification_lines),
+        identification_content_line_count=identification_content_line_count,
     )
 
 
-def select_identification_lines(lines: list[str]) -> list[str]:
-    max_lines = FRONT_BACK_LINES * 2
-    if len(lines) <= max_lines:
+def wrap_source_lines(lines: list[SourceLine]) -> list[SourceLine]:
+    wrapped: list[SourceLine] = []
+    for line in lines:
+        if len(line.text) <= MAX_WORD_LINE_CHARS:
+            wrapped.append(line)
+            continue
+
+        parts = split_long_line(line.text, MAX_WORD_LINE_CHARS)
+        for index, part in enumerate(parts):
+            wrapped.append(
+                SourceLine(
+                    part,
+                    counts_as_source=line.counts_as_source and index == 0,
+                    is_source_text=line.is_source_text,
+                )
+            )
+    return wrapped
+
+
+def split_long_line(line: str, width: int) -> list[str]:
+    return [line[index : index + width] for index in range(0, len(line), width)] or [line]
+
+
+def select_identification_lines(lines: list[SourceLine], source_content_line_count: int) -> list[SourceLine]:
+    if source_content_line_count < IDENTIFICATION_TOTAL_LINES:
         return lines
-    return lines[:FRONT_BACK_LINES] + lines[-FRONT_BACK_LINES:]
+
+    if len(lines) < IDENTIFICATION_TOTAL_LINES:
+        return lines
+
+    first_part_end = FRONT_BACK_LINES
+    end_index = find_module_end_index(lines, minimum_index=IDENTIFICATION_TOTAL_LINES)
+    if end_index is None:
+        return lines
+
+    back_start = end_index - FRONT_BACK_LINES
+    if back_start < first_part_end:
+        return lines
+
+    selected = lines[:first_part_end] + lines[back_start:end_index]
+    if not is_valid_identification_selection(selected):
+        return lines
+    return selected
 
 
-def write_code_docx(path: Path, lines: list[str], software_name: str, version: str) -> None:
+def count_source_content_lines(lines: list[SourceLine]) -> int:
+    return sum(1 for line in lines if line.counts_as_source)
+
+
+def find_module_end_index(lines: list[SourceLine], minimum_index: int) -> int | None:
+    for index in range(len(lines), minimum_index - 1, -1):
+        line = lines[index - 1]
+        if line.is_source_text and is_module_end_line(line.text):
+            return index
+    return None
+
+
+def is_module_end_line(line: str) -> bool:
+    return any(pattern.match(line) for pattern in MODULE_END_PATTERNS)
+
+
+def is_valid_identification_selection(lines: list[SourceLine]) -> bool:
+    return (
+        len(lines) == IDENTIFICATION_TOTAL_LINES
+        and lines[-1].is_source_text
+        and is_module_end_line(lines[-1].text)
+    )
+
+
+def write_code_docx(
+    path: Path,
+    lines: list[SourceLine],
+    software_name: str,
+    version: str,
+    page_break_interval: int | None = None,
+) -> None:
     doc = Document()
     setup_document(doc, software_name, version)
 
-    for line in lines:
+    for index, line in enumerate(lines, start=1):
         paragraph = doc.add_paragraph()
         paragraph.paragraph_format.space_before = Pt(0)
         paragraph.paragraph_format.space_after = Pt(0)
-        paragraph.paragraph_format.line_spacing = 1
-        run = paragraph.add_run(line if line else " ")
+        paragraph.paragraph_format.line_spacing = Pt(14)
+        run = paragraph.add_run(line.text if line.text else " ")
         apply_run_font(run)
+        if page_break_interval and index % page_break_interval == 0 and index < len(lines):
+            run.add_break(WD_BREAK.PAGE)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(path)

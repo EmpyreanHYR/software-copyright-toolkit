@@ -168,8 +168,8 @@ class ToolkitApp(tk.Tk):
                     include_identification=selections["identification"],
                     include_full=selections["full"],
                 )
-                source_lines = documents.source_line_count
-                identification_lines = documents.identification_line_count
+                source_lines = documents.source_content_line_count
+                identification_lines = documents.identification_content_line_count
                 if documents.identification_docx is not None:
                     generated_files.append(documents.identification_docx)
                 if documents.full_docx is not None:
@@ -201,7 +201,7 @@ class ToolkitApp(tk.Tk):
             if data["selections"]["report"] and (data["selections"]["identification"] or data["selections"]["full"]):
                 self.status_var.set(
                     f"生成完成：统计 {data['stats_count']} 个文件，"
-                    f"有效代码 {data['effective']} 行，鉴别材料 {data['identification_lines']} 行。"
+                    f"有效代码 {data['effective']} 行，鉴别材料代码/注释 {data['identification_lines']} 行。"
                 )
             elif data["selections"]["report"]:
                 self.status_var.set(
