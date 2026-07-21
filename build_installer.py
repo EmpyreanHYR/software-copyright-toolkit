@@ -21,9 +21,17 @@ ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
 
 
-def build_cli() -> Path:
+def _suffix_name(base: str, suffix: str | None) -> str:
+    """构造带版本后缀的文件名。"""
+    if suffix:
+        return f"{base}-{suffix}"
+    return base
+
+
+def build_cli(suffix: str | None = None) -> Path:
     """打包 CLI 为单文件 exe。"""
-    print("Building CLI...")
+    name = _suffix_name("sct-cli", suffix)
+    print(f"Building CLI ({name})...")
     subprocess.run(
         [
             sys.executable,
@@ -31,7 +39,7 @@ def build_cli() -> Path:
             "PyInstaller",
             "--onefile",
             "--name",
-            "sct-cli",
+            name,
             "--distpath",
             str(DIST),
             "--workpath",
@@ -42,19 +50,21 @@ def build_cli() -> Path:
         ],
         check=True,
     )
-    return DIST / "sct-cli.exe" if sys.platform == "win32" else DIST / "sct-cli"
+    exe_ext = ".exe" if sys.platform == "win32" else ""
+    return DIST / f"{name}{exe_ext}"
 
 
-def build_gui() -> Path:
+def build_gui(suffix: str | None = None) -> Path:
     """打包 GUI 为单文件 exe（Windows 下无控制台窗口）。"""
-    print("Building GUI...")
+    name = _suffix_name("sct-gui", suffix)
+    print(f"Building GUI ({name})...")
     args = [
         sys.executable,
         "-m",
         "PyInstaller",
         "--onefile",
         "--name",
-        "sct-gui",
+        name,
         "--distpath",
         str(DIST),
         "--workpath",
@@ -66,7 +76,8 @@ def build_gui() -> Path:
         args.append("--noconsole")
     args.append(str(ROOT / "src" / "software_copyright_toolkit" / "gui.py"))
     subprocess.run(args, check=True)
-    return DIST / "sct-gui.exe" if sys.platform == "win32" else DIST / "sct-gui"
+    exe_ext = ".exe" if sys.platform == "win32" else ""
+    return DIST / f"{name}{exe_ext}"
 
 
 def clean() -> None:
@@ -84,6 +95,7 @@ def main() -> None:
     parser.add_argument("--cli", action="store_true", help="仅打包 CLI")
     parser.add_argument("--gui", action="store_true", help="仅打包 GUI")
     parser.add_argument("--clean", action="store_true", help="清理构建产物")
+    parser.add_argument("--suffix", help="版本后缀，如 v1.0.0，生成 sct-cli-v1.0.0.exe")
     args = parser.parse_args()
 
     if args.clean:
@@ -97,11 +109,11 @@ def main() -> None:
     DIST.mkdir(parents=True, exist_ok=True)
 
     if args.all or args.cli:
-        cli_path = build_cli()
+        cli_path = build_cli(suffix=args.suffix)
         print(f"CLI 已打包: {cli_path}")
 
     if args.all or args.gui:
-        gui_path = build_gui()
+        gui_path = build_gui(suffix=args.suffix)
         print(f"GUI 已打包: {gui_path}")
 
     print("\n打包完成！可执行文件位于 dist/ 目录。")

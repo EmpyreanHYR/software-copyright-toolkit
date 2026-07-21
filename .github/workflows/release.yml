@@ -5,15 +5,17 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      suffix:
+        description: "版本后缀（如 v1.0.0），留空则不带后缀"
+        required: false
+        default: ""
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -27,28 +29,40 @@ jobs:
           uv sync
           uv run python -m pip install pyinstaller
 
+      - name: Determine version suffix
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "suffix=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            SUFFIX="${{ inputs.suffix }}"
+            if [ -z "$SUFFIX" ]; then
+              echo "suffix=" >> "$GITHUB_OUTPUT"
+            else
+              echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
       - name: Build binaries
-        run: uv run python build_installer.py --all
+        shell: bash
+        run: |
+          if [ -n "${{ steps.version.outputs.suffix }}" ]; then
+            uv run python build_installer.py --all --suffix "${{ steps.version.outputs.suffix }}"
+          else
+            uv run python build_installer.py --all
+          fi
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: sct-${{ matrix.os }}
-          path: dist/*
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create Release
+      - name: Create Release (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: dist/*
           generate_release_notes: true
+
+      - name: Upload artifacts (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sct-windows
+          path: dist/*
