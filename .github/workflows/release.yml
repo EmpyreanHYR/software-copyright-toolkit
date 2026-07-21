@@ -46,6 +46,8 @@ jobs:
 
       - name: Build binaries
         shell: bash
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           if [ -n "${{ steps.version.outputs.suffix }}" ]; then
             uv run python build_installer.py --all --suffix "${{ steps.version.outputs.suffix }}"

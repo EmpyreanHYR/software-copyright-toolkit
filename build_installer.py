@@ -17,6 +17,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# 确保 Windows 下 print 中文不崩溃
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+
 ROOT = Path(__file__).resolve().parent
 DIST = ROOT / "dist"
 
