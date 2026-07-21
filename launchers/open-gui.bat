@@ -75,5 +75,8 @@ echo Starting GUI...
 uv run sct-gui
 set "EXIT_CODE=%ERRORLEVEL%"
 popd >nul
-if not "%EXIT_CODE%"=="0" pause
+if not "%EXIT_CODE%"=="0" (
+  echo GUI 异常退出，退出码: %EXIT_CODE%
+)
+pause
 exit /b %EXIT_CODE%
