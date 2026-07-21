@@ -27,7 +27,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync
-          uv run python -m pip install pyinstaller
+          uv pip install pyinstaller
 
       - name: Determine version suffix
         id: version
