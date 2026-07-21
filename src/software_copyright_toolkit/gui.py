@@ -1,35 +1,43 @@
 from __future__ import annotations
 
+import os
 import queue
+import subprocess
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from software_copyright_toolkit import count_folder, make_report
+from software_copyright_toolkit.counter import count_folder
 from software_copyright_toolkit.documents import (
+    DEFAULT_SEPARATOR,
+    DISCLAIMER_NOTE,
     generate_identification_documents,
     sanitize_filename,
 )
+from software_copyright_toolkit.report import make_report
 
 
 class ToolkitApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Software Copyright Toolkit")
-        self.geometry("720x470")
-        self.minsize(680, 450)
+        self.geometry("720x510")
+        self.minsize(680, 490)
 
         self.target_var = tk.StringVar()
         self.output_var = tk.StringVar(value=str(Path.cwd()))
         self.name_var = tk.StringVar()
         self.version_var = tk.StringVar(value="V1.0")
+        self.separator_var = tk.StringVar(value=DEFAULT_SEPARATOR)
         self.generate_report_var = tk.BooleanVar(value=True)
         self.generate_identification_var = tk.BooleanVar(value=True)
         self.generate_full_var = tk.BooleanVar(value=True)
         self.status_var = tk.StringVar(value="请选择目标文件夹；生成 Word 时需要填写软件名称和版本号。")
         self.result_queue: queue.Queue[tuple[str, object]] = queue.Queue()
 
+        self.output_dir_for_open: Path | None = None
         self.build_ui()
         self.after(150, self.poll_result_queue)
 
@@ -56,15 +64,18 @@ class ToolkitApp(tk.Tk):
         ttk.Label(root, text="版本号").grid(row=4, column=0, sticky="w", pady=6)
         ttk.Entry(root, textvariable=self.version_var).grid(row=4, column=1, columnspan=2, sticky="ew", padx=(10, 0))
 
+        ttk.Label(root, text="文件分隔符").grid(row=5, column=0, sticky="w", pady=6)
+        ttk.Entry(root, textvariable=self.separator_var).grid(row=5, column=1, columnspan=2, sticky="ew", padx=(10, 0))
+
         actions = ttk.Frame(root)
-        actions.grid(row=5, column=0, columnspan=3, sticky="ew", pady=(18, 12))
+        actions.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(18, 12))
         actions.columnconfigure(0, weight=1)
         self.generate_button = ttk.Button(actions, text="生成材料", command=self.start_generation)
         self.generate_button.grid(row=0, column=0, sticky="ew")
 
-        ttk.Label(root, text="将生成").grid(row=6, column=0, sticky="nw", pady=(12, 4))
+        ttk.Label(root, text="将生成").grid(row=7, column=0, sticky="nw", pady=(12, 4))
         options = ttk.Frame(root)
-        options.grid(row=6, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=(8, 0))
+        options.grid(row=7, column=1, columnspan=2, sticky="w", padx=(10, 0), pady=(8, 0))
         ttk.Checkbutton(options, text="代码行数统计 Markdown", variable=self.generate_report_var).grid(
             row=0, column=0, sticky="w", pady=2
         )
@@ -75,10 +86,18 @@ class ToolkitApp(tk.Tk):
             row=2, column=0, sticky="w", pady=2
         )
 
-        ttk.Separator(root).grid(row=7, column=0, columnspan=3, sticky="ew", pady=16)
-        ttk.Label(root, textvariable=self.status_var, foreground="#2f5f8f").grid(
-            row=8, column=0, columnspan=3, sticky="w"
+        ttk.Separator(root).grid(row=8, column=0, columnspan=3, sticky="ew", pady=16)
+
+        status_row = ttk.Frame(root)
+        status_row.grid(row=9, column=0, columnspan=3, sticky="ew")
+        status_row.columnconfigure(0, weight=1)
+        ttk.Label(status_row, textvariable=self.status_var, foreground="#2f5f8f").grid(
+            row=0, column=0, sticky="w"
         )
+        self.open_dir_button = ttk.Button(
+            status_row, text="打开输出目录", command=self.open_output_dir, state="disabled"
+        )
+        self.open_dir_button.grid(row=0, column=1, sticky="e", padx=(10, 0))
 
     def choose_target(self) -> None:
         folder = filedialog.askdirectory(title="选择要统计和整理的代码文件夹")
@@ -92,9 +111,20 @@ class ToolkitApp(tk.Tk):
         if folder:
             self.output_var.set(folder)
 
+    def open_output_dir(self) -> None:
+        if self.output_dir_for_open is None or not self.output_dir_for_open.exists():
+            return
+        path_str = str(self.output_dir_for_open.resolve())
+        if sys.platform == "win32":
+            os.startfile(path_str)  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.run(["open", path_str], check=False)
+        else:
+            subprocess.run(["xdg-open", path_str], check=False)
+
     def start_generation(self) -> None:
         try:
-            target, output_dir, software_name, version, selections = self.validate_inputs()
+            target, output_dir, software_name, version, separator, selections = self.validate_inputs()
         except ValueError as exc:
             messagebox.showwarning("需要补充信息", str(exc))
             return
@@ -103,16 +133,17 @@ class ToolkitApp(tk.Tk):
         self.status_var.set("正在生成，请稍候...")
         thread = threading.Thread(
             target=self.generate_files,
-            args=(target, output_dir, software_name, version, selections),
+            args=(target, output_dir, software_name, version, separator, selections),
             daemon=True,
         )
         thread.start()
 
-    def validate_inputs(self) -> tuple[Path, Path, str, str, dict[str, bool]]:
+    def validate_inputs(self) -> tuple[Path, Path, str, str, str, dict[str, bool]]:
         target = Path(self.target_var.get()).expanduser()
         output_dir = Path(self.output_var.get()).expanduser()
         software_name = self.name_var.get().strip()
         version = self.version_var.get().strip()
+        separator = self.separator_var.get().strip() or DEFAULT_SEPARATOR
         selections = {
             "report": self.generate_report_var.get(),
             "identification": self.generate_identification_var.get(),
@@ -128,7 +159,7 @@ class ToolkitApp(tk.Tk):
         if (selections["identification"] or selections["full"]) and not version:
             raise ValueError("请输入版本号。")
 
-        return target.resolve(), output_dir.resolve(), software_name, version, selections
+        return target.resolve(), output_dir.resolve(), software_name, version, separator, selections
 
     def generate_files(
         self,
@@ -136,6 +167,7 @@ class ToolkitApp(tk.Tk):
         output_dir: Path,
         software_name: str,
         version: str,
+        separator: str,
         selections: dict[str, bool],
     ) -> None:
         try:
@@ -167,6 +199,7 @@ class ToolkitApp(tk.Tk):
                     version,
                     include_identification=selections["identification"],
                     include_full=selections["full"],
+                    separator_template=separator,
                 )
                 source_lines = documents.source_content_line_count
                 identification_lines = documents.identification_content_line_count
@@ -177,6 +210,7 @@ class ToolkitApp(tk.Tk):
 
             payload = {
                 "files": generated_files,
+                "output_dir": output_dir,
                 "selections": selections,
                 "stats_count": stats_count,
                 "skipped_count": skipped_count,
@@ -217,8 +251,11 @@ class ToolkitApp(tk.Tk):
             )
             messagebox.showinfo(
                 "生成完成",
-                f"已生成：\n{file_list}{skipped_note}",
+                f"已生成：\n{file_list}{skipped_note}\n\n{DISCLAIMER_NOTE}",
             )
+            self.output_dir_for_open = data.get("output_dir")
+            if self.output_dir_for_open:
+                self.open_dir_button.configure(state="normal")
         else:
             self.status_var.set("生成失败。")
             messagebox.showerror("生成失败", str(payload))

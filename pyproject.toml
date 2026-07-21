@@ -1,17 +1,47 @@
 [project]
 name = "software-copyright-toolkit"
 version = "0.1.0"
-description = "Toolkit for code line auditing and software copyright documentation preparation."
+description = "CLI/GUI 工具：统计代码行数并一键生成符合中国软著申请规范的程序鉴别材料 (Word)。"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "python-docx>=1.1.2",
 ]
 
+[project.optional-dependencies]
+charset-normalizer = ["charset-normalizer>=3.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
 [project.scripts]
 count-code = "software_copyright_toolkit:main"
 sct-cli = "software_copyright_toolkit:main"
 sct-gui = "software_copyright_toolkit.gui:main"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
 
 [build-system]
 requires = ["uv_build>=0.9.0,<0.12.0"]

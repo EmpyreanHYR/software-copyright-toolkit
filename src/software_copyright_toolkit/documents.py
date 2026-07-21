@@ -12,12 +12,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
 
-from software_copyright_toolkit import (
-    SkippedFile,
-    count_supported_file,
-    iter_files,
-    read_text_lossless,
-)
+from software_copyright_toolkit.counter import SkippedFile, count_supported_file
+from software_copyright_toolkit.scanner import iter_files, read_text_lossless
 
 
 LINES_PER_PAGE = 50
@@ -56,7 +52,13 @@ class SourceLine:
     is_source_text: bool
 
 
-def collect_source_lines(target: Path) -> tuple[list[SourceLine], list[SkippedFile]]:
+DEFAULT_SEPARATOR = "===== 文件: {path} ====="
+
+
+def collect_source_lines(
+    target: Path,
+    separator_template: str = DEFAULT_SEPARATOR,
+) -> tuple[list[SourceLine], list[SkippedFile]]:
     lines: list[SourceLine] = []
     skipped: list[SkippedFile] = []
 
@@ -72,7 +74,7 @@ def collect_source_lines(target: Path) -> tuple[list[SourceLine], list[SkippedFi
             continue
 
         rel = str(path.relative_to(target)).replace("\\", "/")
-        lines.append(SourceLine(f"===== 文件: {rel} =====", counts_as_source=False, is_source_text=False))
+        lines.append(SourceLine(separator_template.format(path=rel), counts_as_source=False, is_source_text=False))
         lines.extend(
             SourceLine(line.expandtabs(4), counts_as_source=True, is_source_text=True)
             for line in text.splitlines()
@@ -89,8 +91,9 @@ def generate_identification_documents(
     version: str,
     include_identification: bool = True,
     include_full: bool = True,
+    separator_template: str = DEFAULT_SEPARATOR,
 ) -> GeneratedDocuments:
-    source_lines, _ = collect_source_lines(target)
+    source_lines, _ = collect_source_lines(target, separator_template=separator_template)
     if not source_lines:
         raise ValueError("没有可用于生成程序鉴别材料的已适配代码文件。")
     if not include_identification and not include_full:
@@ -224,6 +227,12 @@ def is_valid_identification_selection(lines: list[SourceLine]) -> bool:
         and lines[-1].is_source_text
         and is_module_end_line(lines[-1].text)
     )
+
+
+DISCLAIMER_NOTE = (
+    "【提示】页数基于标准 A4 纸张（21 cm × 29.7 cm）及默认页边距（上下各 2 cm，左右各 2 cm）估算。"
+    "生成后建议在 Word 中通过「审阅 → 字数统计 → 行数」进行最终复核。"
+)
 
 
 def write_code_docx(

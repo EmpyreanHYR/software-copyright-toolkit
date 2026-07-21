@@ -16,12 +16,33 @@ if errorlevel 1 (
   set /p INSTALL_UV=Install uv now? [Y/N] 
   if /i not "%INSTALL_UV%"=="Y" (
     echo Cancelled.
+    echo.
+    echo You can also install uv manually: https://docs.astral.sh/uv/getting-started/installation/
+    echo Or use pip to install dependencies directly:
+    echo   pip install python-docx
+    echo   python -m software_copyright_toolkit.gui
     popd >nul
     pause
     exit /b 1
   )
 
-  powershell -NoProfile -ExecutionPolicy ByPass -Command "irm https://astral.sh/uv/install.ps1 | iex"
+  echo Downloading uv installer (timeout: 60s)...
+  powershell -NoProfile -ExecutionPolicy ByPass -Command ^
+    "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " ^
+    "try { " ^
+    "  $req = [System.Net.WebRequest]::Create('https://astral.sh/uv/install.ps1'); " ^
+    "  $req.Timeout = 60000; " ^
+    "  $resp = $req.GetResponse(); " ^
+    "  $stream = $resp.GetResponseStream(); " ^
+    "  $reader = New-Object System.IO.StreamReader($stream); " ^
+    "  $script = $reader.ReadToEnd(); " ^
+    "  Invoke-Expression $script; " ^
+    "} catch { " ^
+    "  Write-Host 'Failed to download uv installer (network error or timeout).'; " ^
+    "  Write-Host 'Please install uv manually: https://docs.astral.sh/uv/getting-started/installation/'; " ^
+    "  Write-Host 'Or use pip: pip install python-docx && python -m software_copyright_toolkit.gui'; " ^
+    "  exit 1; " ^
+    "}"
   set "PATH=%USERPROFILE%\.local\bin;%USERPROFILE%\.cargo\bin;%PATH%"
 
   where uv >nul 2>nul
@@ -37,10 +58,17 @@ if errorlevel 1 (
 echo Checking project environment and dependencies...
 uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 if errorlevel 1 (
-  echo Failed to prepare the uv environment.
-  popd >nul
-  pause
-  exit /b 1
+  echo uv sync failed. Trying without mirror...
+  uv sync
+  if errorlevel 1 (
+    echo Failed to prepare the uv environment.
+    echo You can try manually:
+    echo   pip install python-docx
+    echo   python -m software_copyright_toolkit.gui
+    popd >nul
+    pause
+    exit /b 1
+  )
 )
 
 echo Starting GUI...

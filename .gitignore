@@ -15,6 +15,7 @@ dist/
 # Local editor and OS files
 .idea/
 .vscode/
+.reasonix/
 .DS_Store
 Thumbs.db
 
