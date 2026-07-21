@@ -6,8 +6,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator
 
 # --- 默认跳过的目录 ---
 SKIP_DIRS: set[str] = {
@@ -37,7 +37,7 @@ _DEFAULT_ENCODINGS = ("utf-8-sig", "utf-8", "gb18030", "utf-16")
 def _try_charset_normalizer(raw: bytes) -> str | None:
     """尝试使用 charset-normalizer 自动检测编码（可选依赖）。"""
     try:
-        from charset_normalizer import from_bytes  # type: ignore[import-untyped]
+        from charset_normalizer import from_bytes  # type: ignore[import-not-found]
     except ImportError:
         return None
 

@@ -8,6 +8,7 @@ import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
+from typing import Any, cast
 
 from software_copyright_toolkit.counter import count_folder
 from software_copyright_toolkit.documents import (
@@ -79,9 +80,9 @@ class ToolkitApp(tk.Tk):
         ttk.Checkbutton(options, text="代码行数统计 Markdown", variable=self.generate_report_var).grid(
             row=0, column=0, sticky="w", pady=2
         )
-        ttk.Checkbutton(options, text="程序鉴别材料 Word（前后30页合并）", variable=self.generate_identification_var).grid(
-            row=1, column=0, sticky="w", pady=2
-        )
+        ttk.Checkbutton(
+            options, text="程序鉴别材料 Word（前后30页合并）", variable=self.generate_identification_var
+        ).grid(row=1, column=0, sticky="w", pady=2)
         ttk.Checkbutton(options, text="全量代码 Word", variable=self.generate_full_var).grid(
             row=2, column=0, sticky="w", pady=2
         )
@@ -91,9 +92,7 @@ class ToolkitApp(tk.Tk):
         status_row = ttk.Frame(root)
         status_row.grid(row=9, column=0, columnspan=3, sticky="ew")
         status_row.columnconfigure(0, weight=1)
-        ttk.Label(status_row, textvariable=self.status_var, foreground="#2f5f8f").grid(
-            row=0, column=0, sticky="w"
-        )
+        ttk.Label(status_row, textvariable=self.status_var, foreground="#2f5f8f").grid(row=0, column=0, sticky="w")
         self.open_dir_button = ttk.Button(
             status_row, text="打开输出目录", command=self.open_output_dir, state="disabled"
         )
@@ -116,7 +115,7 @@ class ToolkitApp(tk.Tk):
             return
         path_str = str(self.output_dir_for_open.resolve())
         if sys.platform == "win32":
-            os.startfile(path_str)  # type: ignore[attr-defined]
+            os.startfile(path_str)
         elif sys.platform == "darwin":
             subprocess.run(["open", path_str], check=False)
         else:
@@ -231,23 +230,19 @@ class ToolkitApp(tk.Tk):
 
         self.generate_button.configure(state="normal")
         if kind == "success":
-            data = payload
+            data = cast("dict[str, Any]", payload)
             if data["selections"]["report"] and (data["selections"]["identification"] or data["selections"]["full"]):
                 self.status_var.set(
                     f"生成完成：统计 {data['stats_count']} 个文件，"
                     f"有效代码 {data['effective']} 行，鉴别材料代码/注释 {data['identification_lines']} 行。"
                 )
             elif data["selections"]["report"]:
-                self.status_var.set(
-                    f"生成完成：统计 {data['stats_count']} 个文件，有效代码 {data['effective']} 行。"
-                )
+                self.status_var.set(f"生成完成：统计 {data['stats_count']} 个文件，有效代码 {data['effective']} 行。")
             else:
                 self.status_var.set(f"生成完成：共生成 {len(data['files'])} 个文件。")
             file_list = "\n".join(str(path) for path in data["files"])
             skipped_note = (
-                f"\n\n未统计文件数：{data['skipped_count']}，详情见 Markdown 报告。"
-                if data["skipped_count"]
-                else ""
+                f"\n\n未统计文件数：{data['skipped_count']}，详情见 Markdown 报告。" if data["skipped_count"] else ""
             )
             messagebox.showinfo(
                 "生成完成",

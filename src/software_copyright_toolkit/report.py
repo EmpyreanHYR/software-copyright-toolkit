@@ -52,9 +52,9 @@ def make_report(target: Path, stats: list[FileStats], skipped: list[SkippedFile]
 
     if skipped:
         rows.extend(["", "## 未统计文件", "", "| 文件 | 原因 |", "| --- | --- |"])
-        for item in sorted(skipped, key=lambda value: str(value.path.relative_to(target)).lower()):
-            rel = str(item.path.relative_to(target)).replace("\\", "/")
-            rows.append(f"| `{rel}` | {item.reason} |")
+        for skipped_item in sorted(skipped, key=lambda value: str(value.path.relative_to(target)).lower()):
+            rel = str(skipped_item.path.relative_to(target)).replace("\\", "/")
+            rows.append(f"| `{rel}` | {skipped_item.reason} |")
     else:
         rows.extend(["", "## 未统计文件", "", "无。"])
 

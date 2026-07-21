@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import io
 import tokenize
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 from software_copyright_toolkit.adapters import (
     HTML_LIKE_EXTENSIONS,
@@ -25,6 +25,7 @@ from software_copyright_toolkit.scanner import iter_files, read_lines_lazy, read
 @dataclass(frozen=True)
 class FileStats:
     """单个文件的统计结果。"""
+
     path: Path
     total: int
     effective: int
@@ -35,6 +36,7 @@ class FileStats:
 @dataclass(frozen=True)
 class SkippedFile:
     """被跳过的文件及其原因。"""
+
     path: Path
     reason: str
 
@@ -110,7 +112,7 @@ def count_block_comments(
             if stripped.startswith(start):
                 matched_block = True
                 comment += 1
-                if end not in stripped[len(start):]:
+                if end not in stripped[len(start) :]:
                     active_end = end
                 break
         if matched_block:
@@ -175,7 +177,7 @@ def count_block_comments_streaming(
             if stripped.startswith(start):
                 matched_block = True
                 comment += 1
-                if end not in stripped[len(start):]:
+                if end not in stripped[len(start) :]:
                     active_end = end
                 break
         if matched_block:

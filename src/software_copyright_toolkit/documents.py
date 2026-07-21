@@ -6,15 +6,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from docx import Document
+from docx.document import Document as DocumentType
 from docx.enum.section import WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.section import Section
 from docx.shared import Cm, Pt
+from docx.text.paragraph import Paragraph
+from docx.text.run import Run
 
 from software_copyright_toolkit.counter import SkippedFile, count_supported_file
 from software_copyright_toolkit.scanner import iter_files, read_text_lossless
-
 
 LINES_PER_PAGE = 50
 FRONT_BACK_PAGES = 30
@@ -116,9 +119,7 @@ def generate_identification_documents(
             identification_lines,
             software_name=software_name,
             version=version,
-            page_break_interval=LINES_PER_PAGE
-            if len(identification_lines) >= IDENTIFICATION_TOTAL_LINES
-            else None,
+            page_break_interval=LINES_PER_PAGE if len(identification_lines) >= IDENTIFICATION_TOTAL_LINES else None,
         )
     if full_path is not None:
         write_code_docx(
@@ -222,11 +223,7 @@ def is_module_end_line(line: str) -> bool:
 
 
 def is_valid_identification_selection(lines: list[SourceLine]) -> bool:
-    return (
-        len(lines) == IDENTIFICATION_TOTAL_LINES
-        and lines[-1].is_source_text
-        and is_module_end_line(lines[-1].text)
-    )
+    return len(lines) == IDENTIFICATION_TOTAL_LINES and lines[-1].is_source_text and is_module_end_line(lines[-1].text)
 
 
 DISCLAIMER_NOTE = (
@@ -256,10 +253,10 @@ def write_code_docx(
             run.add_break(WD_BREAK.PAGE)
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(path)
+    doc.save(str(path))
 
 
-def setup_document(doc: Document, software_name: str, version: str) -> None:
+def setup_document(doc: DocumentType, software_name: str, version: str) -> None:
     enable_field_updates(doc)
 
     normal = doc.styles["Normal"]
@@ -282,7 +279,7 @@ def setup_document(doc: Document, software_name: str, version: str) -> None:
     setup_footer(section)
 
 
-def enable_field_updates(doc: Document) -> None:
+def enable_field_updates(doc: DocumentType) -> None:
     settings = doc.settings._element
     update_fields = settings.find(qn("w:updateFields"))
     if update_fields is None:
@@ -291,7 +288,7 @@ def enable_field_updates(doc: Document) -> None:
     update_fields.set(qn("w:val"), "true")
 
 
-def setup_header(section, software_name: str, version: str) -> None:
+def setup_header(section: Section, software_name: str, version: str) -> None:
     header = section.header
     paragraph = header.paragraphs[0]
     clear_paragraph(paragraph)
@@ -305,7 +302,7 @@ def setup_header(section, software_name: str, version: str) -> None:
     add_field(paragraph, "PAGE")
 
 
-def setup_footer(section) -> None:
+def setup_footer(section: Section) -> None:
     footer = section.footer
     paragraph = footer.paragraphs[0]
     clear_paragraph(paragraph)
@@ -317,18 +314,19 @@ def setup_footer(section) -> None:
     add_field(paragraph, "NUMPAGES")
 
 
-def clear_paragraph(paragraph) -> None:
+def clear_paragraph(paragraph: Paragraph) -> None:
     for child in list(paragraph._p):
         paragraph._p.remove(child)
 
 
-def apply_run_font(run) -> None:
+def apply_run_font(run: Run) -> None:
     run.font.name = "Arial"
     run.font.size = Pt(10)
-    run._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
+    if run._element.rPr is not None and run._element.rPr.rFonts is not None:
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), "Arial")
 
 
-def add_field(paragraph, instruction: str) -> None:
+def add_field(paragraph: Paragraph, instruction: str) -> None:
     run = paragraph.add_run()
     apply_run_font(run)
 
