@@ -16,6 +16,29 @@
 > (截图建议放在 `docs/screenshots/` 目录下，然后在下方用 `![GUI](docs/screenshots/gui.png)` 引用)
 
 ---
+## 🚀 完整软著申请解决方案
+
+本仓库专注于提供高效的 **程序鉴别材料**（源代码）生成与统计工具。如果您还需要准备 **文档鉴别材料**（软件使用说明书 / 设计文档），强烈推荐搭配使用配套的高质量排版模板：
+
+[![Software Copyright LaTeX Template](https://img.shields.io/badge/配套模板-软件著作权%20LaTeX%20模板-orange?style=for-the-badge&logo=latex)](https://github.com/EmpyreanHYR/copyright-of-computer-software_latex_template)
+
+### 为什么推荐它？
+| 特性 | 说明 |
+| :--- | :--- |
+| 📐 **严格符合规范** | 页面布局、字体、字号及页眉页脚严格遵循中国版权保护中心软著申请的格式要求 |
+| 🎨 **专业级排版** | 基于 LaTeX 引擎，彻底告别 Word 排版错乱、图片压缩模糊、目录更新繁琐等痛点 |
+| 📝 **开箱即用** | 提供结构清晰的示例文件，只需替换软件名称、界面截图和简单描述即可快速编译出 PDF |
+| 🔄 **灵活可扩展** | 完美支持“软件使用说明书”与“软件设计文档”等多种软著必要文档的模板切换与定制 |
+
+> **💡 最佳实践工作流**：  
+> 1. 使用本 [software-copyright-toolkit](https://github.com/EmpyreanHYR/software-copyright-toolkit) 一键统计代码并生成符合规范的“源代码前后 30 页” Word 文档。  
+> 2. 使用配套 [LaTeX 模板](https://github.com/EmpyreanHYR/copyright-of-computer-software_latex_template) 填写并编译生成专业的软件使用说明书 PDF。  
+> 3. 合并导出，轻松、专业地完成软著登记全套材料准备！
+
+---
+
+
+
 
 ## 目录
 
