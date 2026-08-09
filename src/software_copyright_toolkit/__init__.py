@@ -34,7 +34,6 @@ from software_copyright_toolkit.counter import (
     count_python,
     count_supported_file,
 )
-from software_copyright_toolkit.file_selector import FileSelectorDialog, ask_selected_files
 from software_copyright_toolkit.report import make_report
 from software_copyright_toolkit.scanner import (
     SKIP_DIRS,
@@ -74,9 +73,6 @@ __all__ = [
     "count_line_comments",
     "count_python",
     "count_supported_file",
-    # file_selector
-    "FileSelectorDialog",
-    "ask_selected_files",
     # report
     "make_report",
     # scanner
