@@ -110,6 +110,7 @@ def normalize_suffix(path: Path) -> str:
 
 # --- 用户自定义语言配置 ---
 
+
 def _load_toml_config(config_path: Path) -> dict[str, LanguageRule]:
     """从 TOML 文件加载用户自定义语言配置。
 

@@ -297,26 +297,15 @@ class FileSelectorDialog(tk.Toplevel):
 
     def _update_status(self) -> None:
         """更新底部状态栏。"""
-        total_files = sum(
-            1 for iid, path in self._iid_to_path.items()
-            if path.is_file()
-        )
+        total_files = sum(1 for iid, path in self._iid_to_path.items() if path.is_file())
         selected_files = sum(
-            1 for iid, path in self._iid_to_path.items()
-            if path.is_file() and self._checked.get(iid) == _CHECKED
+            1 for iid, path in self._iid_to_path.items() if path.is_file() and self._checked.get(iid) == _CHECKED
         )
-        total_dirs = sum(
-            1 for iid, path in self._iid_to_path.items()
-            if path.is_dir()
-        )
+        total_dirs = sum(1 for iid, path in self._iid_to_path.items() if path.is_dir())
         selected_dirs = sum(
-            1 for iid, path in self._iid_to_path.items()
-            if path.is_dir() and self._checked.get(iid) == _CHECKED
+            1 for iid, path in self._iid_to_path.items() if path.is_dir() and self._checked.get(iid) == _CHECKED
         )
-        self._status_var.set(
-            f"已选 {selected_files}/{total_files} 个文件，"
-            f"{selected_dirs}/{total_dirs} 个文件夹"
-        )
+        self._status_var.set(f"已选 {selected_files}/{total_files} 个文件，{selected_dirs}/{total_dirs} 个文件夹")
 
     def _check_all(self) -> None:
         """全选。"""

@@ -19,9 +19,7 @@ class TestWriteCodeDocx:
 
     def test_basic_generation(self, tmp_path):
         """生成基本的 Word 文档并验证文件存在。"""
-        lines = [
-            SourceLine(f"line {i}", counts_as_source=True, is_source_text=True) for i in range(10)
-        ]
+        lines = [SourceLine(f"line {i}", counts_as_source=True, is_source_text=True) for i in range(10)]
         out = tmp_path / "test.docx"
         write_code_docx(out, lines, software_name="TestApp", version="V1.0")
         assert out.exists()
@@ -94,9 +92,7 @@ class TestWriteCodeDocx:
 
     def test_docx_with_page_breaks(self, tmp_path):
         """验证分页符功能。"""
-        lines = [
-            SourceLine(f"line {i}", counts_as_source=True, is_source_text=True) for i in range(100)
-        ]
+        lines = [SourceLine(f"line {i}", counts_as_source=True, is_source_text=True) for i in range(100)]
         out = tmp_path / "test.docx"
         write_code_docx(out, lines, software_name="TestApp", version="V1.0", page_break_interval=50)
 
@@ -107,9 +103,7 @@ class TestWriteCodeDocx:
 
     def test_docx_without_page_breaks(self, tmp_path):
         """不使用分页符时文档仍正常生成。"""
-        lines = [
-            SourceLine(f"line {i}", counts_as_source=True, is_source_text=True) for i in range(10)
-        ]
+        lines = [SourceLine(f"line {i}", counts_as_source=True, is_source_text=True) for i in range(10)]
         out = tmp_path / "test.docx"
         write_code_docx(out, lines, software_name="TestApp", version="V1.0")
 
