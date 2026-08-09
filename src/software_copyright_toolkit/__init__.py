@@ -9,9 +9,22 @@ from software_copyright_toolkit.adapters import (
     LINE_COMMENT_ADAPTERS,
     NO_COMMENT_EXTENSIONS,
     PYTHON_EXTENSIONS,
+    BlockCommentRule,
+    LanguageRule,
+    load_custom_adapters,
     normalize_suffix,
 )
 from software_copyright_toolkit.cli import main, parse_args
+from software_copyright_toolkit.controller import (
+    AnalysisPreview,
+    GenerationResult,
+    TaskConfig,
+    estimate_pages,
+    format_success_message,
+    preview_analysis,
+    run_generation,
+    validate_task_config,
+)
 from software_copyright_toolkit.counter import (
     FileStats,
     SkippedFile,
@@ -21,6 +34,7 @@ from software_copyright_toolkit.counter import (
     count_python,
     count_supported_file,
 )
+from software_copyright_toolkit.file_selector import FileSelectorDialog, ask_selected_files
 from software_copyright_toolkit.report import make_report
 from software_copyright_toolkit.scanner import (
     SKIP_DIRS,
@@ -36,10 +50,22 @@ __all__ = [
     "LINE_COMMENT_ADAPTERS",
     "NO_COMMENT_EXTENSIONS",
     "PYTHON_EXTENSIONS",
+    "BlockCommentRule",
+    "LanguageRule",
+    "load_custom_adapters",
     "normalize_suffix",
     # cli
     "main",
     "parse_args",
+    # controller
+    "AnalysisPreview",
+    "GenerationResult",
+    "TaskConfig",
+    "estimate_pages",
+    "format_success_message",
+    "preview_analysis",
+    "run_generation",
+    "validate_task_config",
     # counter
     "FileStats",
     "SkippedFile",
@@ -48,6 +74,9 @@ __all__ = [
     "count_line_comments",
     "count_python",
     "count_supported_file",
+    # file_selector
+    "FileSelectorDialog",
+    "ask_selected_files",
     # report
     "make_report",
     # scanner

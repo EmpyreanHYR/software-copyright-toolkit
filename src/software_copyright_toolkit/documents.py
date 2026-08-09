@@ -61,11 +61,15 @@ DEFAULT_SEPARATOR = "===== 文件: {path} ====="
 def collect_source_lines(
     target: Path,
     separator_template: str = DEFAULT_SEPARATOR,
+    include_paths: frozenset[Path] | set[Path] | None = None,
 ) -> tuple[list[SourceLine], list[SkippedFile]]:
     lines: list[SourceLine] = []
     skipped: list[SkippedFile] = []
 
     for path in sorted(iter_files(target), key=lambda item: str(item.relative_to(target)).lower()):
+        # 如果指定了 include_paths，仅处理包含在内的文件
+        if include_paths is not None and path.resolve() not in include_paths:
+            continue
         try:
             text = read_text_lossless(path)
         except (OSError, UnicodeError) as exc:
@@ -95,8 +99,9 @@ def generate_identification_documents(
     include_identification: bool = True,
     include_full: bool = True,
     separator_template: str = DEFAULT_SEPARATOR,
+    include_paths: frozenset[Path] | set[Path] | None = None,
 ) -> GeneratedDocuments:
-    source_lines, _ = collect_source_lines(target, separator_template=separator_template)
+    source_lines, _ = collect_source_lines(target, separator_template=separator_template, include_paths=include_paths)
     if not source_lines:
         raise ValueError("没有可用于生成程序鉴别材料的已适配代码文件。")
     if not include_identification and not include_full:

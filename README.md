@@ -10,7 +10,10 @@
 - 📝 **Markdown 报告** — 生成包含汇总和每个文件明细的可读报告
 - 📄 **程序鉴别材料** — 一键生成符合软著申请规范的 Word 文档
 - 🖥️ **图形界面** — 直观的 GUI，无需记忆命令行参数
+- 📂 **文件选择器** — 可视化树形勾选界面，精确控制纳入统计的文件和文件夹
 - 🔧 **高度可定制** — 自定义文件分隔符、输出目录等
+- 🧩 **插件化语言扩展** — 通过 TOML 配置文件添加自定义语言的注释规则
+- 🦀 **嵌套块注释** — 支持 Rust 等语言的嵌套 `/* /* */ */` 语法
 
 > **截图占位**：此处可添加 GUI 界面截图或操作 GIF 动图，直观展示操作流程。
 > (截图建议放在 `docs/screenshots/` 目录下，然后在下方用 `![GUI](docs/screenshots/gui.png)` 引用)
@@ -229,6 +232,11 @@ uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 界面支持：
 
 - 选择目标代码文件夹
+- **文件选择器** — 选择文件夹后，点击「选择文件...」打开树形勾选界面，可视化筛选要纳入统计的子文件夹和文件
+  - 支持全选/取消全选/展开全部/折叠全部
+  - 父子联动：勾选父节点自动全选子节点
+  - 展开/折叠与勾选操作分离，互不干扰
+  - 每个节点显示 ☑（绿色）/ ☐（灰色）/ ☒（黄色）勾选状态
 - 选择输出目录
 - 输入软件名称
 - 输入版本号
@@ -314,6 +322,40 @@ Markdown 报告包含：
 ---
 
 ## 高级选项
+
+### 自定义语言配置（插件化扩展）
+
+如果内置的 40+ 种语言不能满足需求，可以通过 TOML 配置文件添加自定义语言的注释规则。
+
+在以下任一位置创建配置文件，工具会自动加载：
+
+- `~/.sct/languages.toml` — 用户全局配置
+- 项目根目录 `.sct.toml` — 项目级配置
+
+配置文件格式：
+
+```toml
+[languages]
+# 简写：扩展名 = 配置
+".mylang" = { line_comment = "//", block_comment = [["/*", "*/"]] }
+
+# 完整格式：支持多扩展名、嵌套块注释
+[languages.mylang2]
+extensions = [".ml2", ".ml3"]
+line_comment = ["//", "#"]
+block_comment = [["/*", "*/"], ["<!--", "-->"]]
+block_comment_nesting = [true, false]
+```
+
+### 嵌套块注释支持
+
+Rust 等语言支持嵌套块注释语法 `/* /* inner */ outer */`。工具会自动识别 Rust（`.rs`）的嵌套注释，无需额外配置。
+
+对于其他支持嵌套注释的自定义语言，在配置文件中设置 `block_comment_nesting = [true]` 即可。
+
+### 页数不足警告
+
+CLI 和 GUI 在生成程序鉴别材料时，如果估算页数不足 60 页，会自动输出警告提示，帮助用户及时调整。
 
 ### 自定义文件分隔符
 
@@ -445,11 +487,13 @@ uv run python build_installer.py --all
 ```
 src/software_copyright_toolkit/
 ├── __init__.py      # 公共 API 重导出
-├── adapters.py      # 注释规则适配器和语言扩展映射
+├── adapters.py      # 注释规则适配器和语言扩展映射（支持 TOML 自定义）
 ├── scanner.py       # 文件遍历、编码检测、文本读取
-├── counter.py       # 代码行数统计算法
+├── counter.py       # 代码行数统计算法（支持嵌套块注释）
 ├── cli.py           # CLI 参数解析和入口调度
+├── controller.py    # 业务逻辑控制器（GUI/CLI 共享）
 ├── report.py        # Markdown 报告生成
 ├── documents.py     # Word 程序鉴别材料生成
+├── file_selector.py # 文件树选择对话框组件
 └── gui.py           # Tkinter 图形界面
 ```
