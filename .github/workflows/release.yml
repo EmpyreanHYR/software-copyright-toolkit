@@ -12,20 +12,8 @@ on:
         default: ""
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            artifact-name: sct-linux
-          - os: windows-latest
-            artifact-name: sct-windows
-          - os: macos-latest
-            artifact-name: sct-macos
-
+  build-and-release:
+    runs-on: windows-latest
     permissions:
       contents: write
     steps:
@@ -67,27 +55,16 @@ jobs:
             uv run python build_installer.py --all
           fi
 
-      - name: Upload build artifacts
+      - name: Upload artifacts (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v5
         with:
-          name: ${{ matrix.artifact-name }}
-          path: dist/*
+          name: sct-windows
+          path: dist/*.exe
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Create Release
+      - name: Create Release (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*
+          files: dist/*.exe
           generate_release_notes: true

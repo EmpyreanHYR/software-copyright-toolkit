@@ -6,10 +6,14 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-import tomllib  # type: ignore[import-not-found]
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    tomllib = None
 
 # --- 行注释 + 块注释的语言 ---
 # 每个条目: (行注释前缀, (块注释对, ...))
@@ -127,7 +131,7 @@ def _load_toml_config(config_path: Path) -> dict[str, LanguageRule]:
         [languages]
         ".mylang" = { line_comment = "//", block_comment = [["/*", "*/"]] }
     """
-    if not config_path.is_file():
+    if not config_path.is_file() or tomllib is None:
         return {}
 
     with config_path.open("rb") as f:

@@ -1,5 +1,6 @@
 """测试注释规则适配器。"""
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -120,6 +121,7 @@ class TestLanguageRule:
         assert rule.block_rules == ()
 
 
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="tomllib requires Python 3.11+")
 class TestLoadTomlConfig:
     """测试 TOML 配置加载。"""
 
@@ -190,6 +192,7 @@ class TestLoadCustomAdapters:
         assert ".sh" in merged
         assert ".rs" in merged
 
+    @pytest.mark.skipif(sys.version_info < (3, 11), reason="tomllib requires Python 3.11+")
     def test_custom_overrides_builtin(self, tmp_path):
         config_file = tmp_path / "languages.toml"
         config_file.write_text(
