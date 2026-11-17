@@ -12,30 +12,35 @@ from software_copyright_toolkit.controller import (
     validate_task_config,
 )
 from software_copyright_toolkit.counter import count_folder
-from software_copyright_toolkit.documents import DISCLAIMER_NOTE
+from software_copyright_toolkit.documents import DISCLAIMER_NOTE, FRONT_BACK_PAGES
 from software_copyright_toolkit.report import make_report
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     """解析命令行参数。"""
     parser = argparse.ArgumentParser(
-        description="统计代码行数，并可生成软著程序鉴别材料。",
+        description="统计代码行数，并可一键生成软著程序鉴别材料（Word/PDF）。",
     )
-    parser.add_argument("folder", type=Path, help="要统计的文件夹路径")
+    parser.add_argument("folder", type=Path, help="要统计的代码文件夹路径")
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path.cwd(),
-        help="报告输出目录，默认是当前命令所在目录",
+        help="报告及材料输出目录，默认是当前命令所在目录",
     )
     parser.add_argument(
         "--generate-docx",
         action="store_true",
-        help="同时生成软著程序鉴别材料 Word 和全量代码 Word",
+        help="生成软著程序鉴别材料 Word (.docx) 和全量代码 Word",
+    )
+    parser.add_argument(
+        "--generate-pdf",
+        action="store_true",
+        help="生成软著程序鉴别材料 PDF (.pdf) 和全量代码 PDF",
     )
     parser.add_argument(
         "--software-name",
-        help="软件名称，生成 Word 材料时必填",
+        help="软件名称，生成 Word/PDF 材料时必填",
     )
     parser.add_argument(
         "--software-version",
@@ -43,6 +48,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         dest="software_version",
         default="V1.0",
         help="软件版本号，默认 V1.0",
+    )
+    parser.add_argument(
+        "--pages",
+        type=int,
+        default=FRONT_BACK_PAGES,
+        help="程序鉴别材料单段页数（默认 30 页，即前后连续各 30 页共 60 页；若设为 60 则前后各 60 页）",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="随机种子（整数），用于以固定确定性顺序打乱文件拼接顺序（不影响源文件本身）",
     )
     parser.add_argument(
         "--separator",
@@ -88,12 +105,14 @@ def main(argv: list[str] | None = None) -> int:
     if not target.is_dir():
         print(f"错误: 目标不是文件夹: {target}", file=sys.stderr)
         return 2
-    if args.generate_docx and (not args.software_name or not args.software_name.strip()):
-        print("错误: 生成 Word 材料时必须提供 --software-name。", file=sys.stderr)
+
+    wants_docs = args.generate_docx or args.generate_pdf
+    if wants_docs and (not args.software_name or not args.software_name.strip()):
+        print("错误: 生成 Word/PDF 材料时必须提供 --software-name。", file=sys.stderr)
         return 2
 
-    # --- 快速预览 ---
-    if not args.generate_docx:
+    # --- 快速预览（仅生成 Markdown 统计报告）---
+    if not wants_docs:
         stats, skipped = count_folder(
             target,
             use_streaming=args.use_streaming,
@@ -112,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"未统计文件数: {len(skipped)}，详情见报告末尾。")
         return 0
 
-    # --- 使用 controller 执行 Word 生成 ---
+    # --- 使用 controller 执行材料生成 ---
     config = TaskConfig(
         target=target,
         output_dir=output_dir,
@@ -122,6 +141,10 @@ def main(argv: list[str] | None = None) -> int:
         generate_report=True,
         generate_identification=True,
         generate_full=True,
+        generate_docx=args.generate_docx,
+        generate_pdf=args.generate_pdf,
+        seed=args.seed,
+        pages_per_section=args.pages,
     )
 
     errors = validate_task_config(config)
@@ -140,13 +163,15 @@ def main(argv: list[str] | None = None) -> int:
     print(f"统计完成: {target}")
     print(f"已统计文件数: {result.stats_count}")
     print(f"全部文件有效代码总行数: {result.effective_lines}")
+    if args.seed is not None:
+        print(f"随机种子: {args.seed}（已应用固定代码顺序打乱，磁盘源码未受任何修改）")
     if result.skipped_count:
         print(f"未统计文件数: {result.skipped_count}，详情见报告末尾。")
 
     if result.generated_files:
         for f in result.generated_files:
             print(f"已生成: {f}")
-        print(f"程序鉴别材料 Word 可见行数: {result.identification_content_lines}")
+        print(f"程序鉴别材料可见行数: {result.identification_content_lines}")
         print(f"全量代码有效代码及注释行数: {result.source_content_lines}")
 
     # 输出警告

@@ -11,12 +11,13 @@ from pathlib import Path
 from software_copyright_toolkit.counter import count_folder
 from software_copyright_toolkit.documents import (
     DISCLAIMER_NOTE,
+    FRONT_BACK_PAGES,
     generate_identification_documents,
     sanitize_filename,
 )
 from software_copyright_toolkit.report import make_report
 
-# 软著申请推荐的最少页数
+# 软著申请推荐的最少页数（前后各30页共60页）
 MIN_RECOMMENDED_PAGES = 60
 # 每页约 50 行
 LINES_PER_PAGE = 50
@@ -37,6 +38,10 @@ class TaskConfig:
     generate_identification: bool
     generate_full: bool
     selected_paths: frozenset[Path] | None = None
+    generate_docx: bool = True
+    generate_pdf: bool = True
+    seed: int | None = None
+    pages_per_section: int = FRONT_BACK_PAGES
 
 
 @dataclass(frozen=True)
@@ -71,10 +76,12 @@ def validate_task_config(config: TaskConfig) -> list[str]:
         errors.append("目标文件夹不存在或不是有效目录。")
     if not config.generate_report and not config.generate_identification and not config.generate_full:
         errors.append("请至少选择一种要生成的文件。")
+    if (config.generate_identification or config.generate_full) and not (config.generate_docx or config.generate_pdf):
+        errors.append("选择生成代码材料时，请至少选择 Word (.docx) 或 PDF (.pdf) 中的一种格式。")
     if (config.generate_identification or config.generate_full) and not config.software_name:
-        errors.append("生成 Word 材料时需要填写软件名称。")
+        errors.append("生成代码材料时需要填写软件名称。")
     if (config.generate_identification or config.generate_full) and not config.version:
-        errors.append("生成 Word 材料时需要填写版本号。")
+        errors.append("生成代码材料时需要填写版本号。")
 
     return errors
 
@@ -150,6 +157,10 @@ def run_generation(config: TaskConfig) -> GenerationResult:
             include_full=config.generate_full,
             separator_template=config.separator,
             include_paths=config.selected_paths,
+            generate_docx=config.generate_docx,
+            generate_pdf=config.generate_pdf,
+            seed=config.seed,
+            front_back_pages=config.pages_per_section,
         )
         source_content_lines = documents.source_content_line_count
         identification_content_lines = documents.identification_content_line_count
@@ -158,12 +169,17 @@ def run_generation(config: TaskConfig) -> GenerationResult:
             generated_files.append(documents.identification_docx)
         if documents.full_docx is not None:
             generated_files.append(documents.full_docx)
+        if documents.identification_pdf is not None:
+            generated_files.append(documents.identification_pdf)
+        if documents.full_pdf is not None:
+            generated_files.append(documents.full_pdf)
 
         # 页数校验警告
+        recommended_pages = config.pages_per_section * 2
         estimated_pages = estimate_pages(identification_content_lines)
-        if estimated_pages < MIN_RECOMMENDED_PAGES and config.generate_identification:
+        if estimated_pages < recommended_pages and config.generate_identification:
             result_warnings.append(
-                f"生成文档约 {estimated_pages} 页，软著申请通常要求不少于 {MIN_RECOMMENDED_PAGES} 页。"
+                f"生成文档约 {estimated_pages} 页，软著申请通常要求不少于 {recommended_pages} 页。"
                 f"建议检查源代码目录或调整 --separator 参数。"
             )
 

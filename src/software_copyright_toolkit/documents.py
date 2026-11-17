@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import random
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -15,6 +17,11 @@ from docx.section import Section
 from docx.shared import Cm, Pt
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
 from software_copyright_toolkit.counter import SkippedFile, count_supported_file
 from software_copyright_toolkit.scanner import iter_files, read_text_lossless
@@ -31,6 +38,58 @@ MODULE_END_PATTERNS = (
     re.compile(r"^\s*end(?:function|class|methods|properties|for|if|while|switch)\b.*$", re.IGNORECASE),
 )
 
+_REGISTERED_PDF_FONT: str | None = None
+
+
+def get_registered_cjk_font() -> str:
+    """查找并注册适用于 PDF 的中文字体，返回注册的字体名称。"""
+    global _REGISTERED_PDF_FONT
+    if _REGISTERED_PDF_FONT is not None:
+        return _REGISTERED_PDF_FONT
+
+    candidates: list[tuple[str, list[str]]] = [
+        (
+            "SimSun",
+            [
+                "C:/Windows/Fonts/simsun.ttc",
+                "C:/Windows/Fonts/simsun.ttf",
+                "C:/Windows/Fonts/msyh.ttc",
+                "C:/Windows/Fonts/simhei.ttf",
+            ],
+        ),
+        (
+            "STSong",
+            [
+                "/System/Library/Fonts/PingFang.ttc",
+                "/Library/Fonts/Songti.ttc",
+                "/System/Library/Fonts/STHeiti Light.ttc",
+                "/Library/Fonts/Arial Unicode.ttf",
+            ],
+        ),
+        (
+            "NotoSansCJK",
+            [
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+                "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+            ],
+        ),
+    ]
+
+    for font_name, paths in candidates:
+        for font_path in paths:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont(font_name, font_path))
+                    _REGISTERED_PDF_FONT = font_name
+                    return font_name
+                except Exception:
+                    continue
+
+    _REGISTERED_PDF_FONT = "Helvetica"
+    return _REGISTERED_PDF_FONT
+
 
 @dataclass(frozen=True)
 class GeneratedDocuments:
@@ -40,6 +99,8 @@ class GeneratedDocuments:
     source_content_line_count: int
     identification_line_count: int
     identification_content_line_count: int
+    identification_pdf: Path | None = None
+    full_pdf: Path | None = None
 
 
 def sanitize_filename(value: str) -> str:
@@ -62,12 +123,26 @@ def collect_source_lines(
     target: Path,
     separator_template: str = DEFAULT_SEPARATOR,
     include_paths: frozenset[Path] | set[Path] | None = None,
+    seed: int | None = None,
 ) -> tuple[list[SourceLine], list[SkippedFile]]:
+    """扫描并收集所有已适配文件的源代码行。
+
+    Args:
+        target: 目标文件夹。
+        separator_template: 文件分隔行模板。
+        include_paths: 可选的文件白名单集合。
+        seed: 可选的随机种子。指定后会在内存中以此种子打乱文件拼接顺序，
+              但绝对不修改磁盘上的源文件本身，保证原始项目功能完全正常。
+    """
     lines: list[SourceLine] = []
     skipped: list[SkippedFile] = []
 
-    for path in sorted(iter_files(target), key=lambda item: str(item.relative_to(target)).lower()):
-        # 如果指定了 include_paths，仅处理包含在内的文件
+    files = sorted(iter_files(target), key=lambda item: str(item.relative_to(target)).lower())
+    if seed is not None:
+        files = list(files)
+        random.Random(seed).shuffle(files)
+
+    for path in files:
         if include_paths is not None and path.resolve() not in include_paths:
             continue
         try:
@@ -100,47 +175,91 @@ def generate_identification_documents(
     include_full: bool = True,
     separator_template: str = DEFAULT_SEPARATOR,
     include_paths: frozenset[Path] | set[Path] | None = None,
+    generate_docx: bool = True,
+    generate_pdf: bool = True,
+    seed: int | None = None,
+    front_back_pages: int = FRONT_BACK_PAGES,
 ) -> GeneratedDocuments:
-    source_lines, _ = collect_source_lines(target, separator_template=separator_template, include_paths=include_paths)
+    """生成软著程序鉴别材料及全量代码文档（支持 Word 和 PDF 格式）。"""
+    source_lines, _ = collect_source_lines(
+        target,
+        separator_template=separator_template,
+        include_paths=include_paths,
+        seed=seed,
+    )
     if not source_lines:
         raise ValueError("没有可用于生成程序鉴别材料的已适配代码文件。")
     if not include_identification and not include_full:
-        raise ValueError("请至少选择一种 Word 材料。")
+        raise ValueError("请至少选择一种材料内容（鉴别材料或全量代码）。")
+    if not generate_docx and not generate_pdf:
+        raise ValueError("请至少选择一种导出格式（Word 或 PDF）。")
 
     name_part = sanitize_filename(software_name)
     version_part = sanitize_filename(version)
     prefix = f"{name_part}_{version_part}_程序鉴别材料"
+    page_tag = f"前后{front_back_pages}页"
 
-    identification_path = output_dir / f"{prefix}_前后30页.docx" if include_identification else None
-    full_path = output_dir / f"{prefix}_全量代码.docx" if include_full else None
+    identification_docx = output_dir / f"{prefix}_{page_tag}.docx" if (include_identification and generate_docx) else None
+    full_docx = output_dir / f"{prefix}_全量代码.docx" if (include_full and generate_docx) else None
+    identification_pdf = output_dir / f"{prefix}_{page_tag}.pdf" if (include_identification and generate_pdf) else None
+    full_pdf = output_dir / f"{prefix}_全量代码.pdf" if (include_full and generate_pdf) else None
+
     source_content_line_count = count_source_content_lines(source_lines)
     display_lines = wrap_source_lines(source_lines)
-    identification_lines = select_identification_lines(display_lines, source_content_line_count)
+    identification_lines = select_identification_lines(
+        display_lines,
+        source_content_line_count,
+        front_back_pages=front_back_pages,
+    )
     identification_content_line_count = count_source_content_lines(identification_lines)
 
-    if identification_path is not None:
+    target_total_lines = front_back_pages * LINES_PER_PAGE * 2
+    break_interval = LINES_PER_PAGE if len(identification_lines) >= target_total_lines else None
+
+    # 生成 Word 文档
+    if identification_docx is not None:
         write_code_docx(
-            identification_path,
+            identification_docx,
             identification_lines,
             software_name=software_name,
             version=version,
-            page_break_interval=LINES_PER_PAGE if len(identification_lines) >= IDENTIFICATION_TOTAL_LINES else None,
+            page_break_interval=break_interval,
         )
-    if full_path is not None:
+    if full_docx is not None:
         write_code_docx(
-            full_path,
+            full_docx,
             display_lines,
             software_name=software_name,
             version=version,
         )
 
+    # 生成 PDF 文档
+    if identification_pdf is not None:
+        write_code_pdf(
+            identification_pdf,
+            identification_lines,
+            software_name=software_name,
+            version=version,
+            page_break_interval=LINES_PER_PAGE,
+        )
+    if full_pdf is not None:
+        write_code_pdf(
+            full_pdf,
+            display_lines,
+            software_name=software_name,
+            version=version,
+            page_break_interval=LINES_PER_PAGE,
+        )
+
     return GeneratedDocuments(
-        identification_docx=identification_path,
-        full_docx=full_path,
+        identification_docx=identification_docx,
+        full_docx=full_docx,
         source_line_count=len(display_lines),
         source_content_line_count=source_content_line_count,
         identification_line_count=len(identification_lines),
         identification_content_line_count=identification_content_line_count,
+        identification_pdf=identification_pdf,
+        full_pdf=full_pdf,
     )
 
 
@@ -189,25 +308,31 @@ def display_width(text: str) -> int:
     return width
 
 
-def select_identification_lines(lines: list[SourceLine], source_content_line_count: int) -> list[SourceLine]:
-    if source_content_line_count < IDENTIFICATION_TOTAL_LINES:
+def select_identification_lines(
+    lines: list[SourceLine],
+    source_content_line_count: int,
+    front_back_pages: int = FRONT_BACK_PAGES,
+) -> list[SourceLine]:
+    """根据软著规范截取鉴别材料代码行（前 N 页 + 后 N 页）。"""
+    front_back_lines = front_back_pages * LINES_PER_PAGE
+    total_lines = front_back_lines * 2
+
+    if source_content_line_count < total_lines and len(lines) < total_lines:
         return lines
 
-    if len(lines) < IDENTIFICATION_TOTAL_LINES:
+    if len(lines) < total_lines:
         return lines
 
-    first_part_end = FRONT_BACK_LINES
-    end_index = find_module_end_index(lines, minimum_index=IDENTIFICATION_TOTAL_LINES)
+    first_part_end = front_back_lines
+    end_index = find_module_end_index(lines, minimum_index=total_lines)
     if end_index is None:
-        return lines
+        end_index = find_graceful_end_index(lines, minimum_index=total_lines)
 
-    back_start = end_index - FRONT_BACK_LINES
+    back_start = end_index - front_back_lines
     if back_start < first_part_end:
-        return lines
+        return lines[:total_lines]
 
     selected = lines[:first_part_end] + lines[back_start:end_index]
-    if not is_valid_identification_selection(selected):
-        return lines
     return selected
 
 
@@ -223,17 +348,31 @@ def find_module_end_index(lines: list[SourceLine], minimum_index: int) -> int | 
     return None
 
 
+def find_graceful_end_index(lines: list[SourceLine], minimum_index: int) -> int:
+    """当未找到标准的大括号/end等结束符时（例如纯 Python 项目），寻找优雅的模块截断点。
+
+    优先从末尾向前寻找顶格非空非注释代码行，或直接以最后一行结束，确保绝不会回退为全量代码。
+    """
+    for index in range(len(lines), minimum_index - 1, -1):
+        line = lines[index - 1]
+        if line.is_source_text and line.text.strip():
+            # 顶格语句通常是一个模块或顶层函数/调用的结束边界
+            if not line.text.startswith(" ") and not line.text.startswith("\t"):
+                return index
+    return len(lines)
+
+
 def is_module_end_line(line: str) -> bool:
     return any(pattern.match(line) for pattern in MODULE_END_PATTERNS)
 
 
-def is_valid_identification_selection(lines: list[SourceLine]) -> bool:
-    return len(lines) == IDENTIFICATION_TOTAL_LINES and lines[-1].is_source_text and is_module_end_line(lines[-1].text)
+def is_valid_identification_selection(lines: list[SourceLine], expected_lines: int = IDENTIFICATION_TOTAL_LINES) -> bool:
+    return len(lines) == expected_lines and lines[-1].is_source_text and is_module_end_line(lines[-1].text)
 
 
 DISCLAIMER_NOTE = (
     "【提示】页数基于标准 A4 纸张（21 cm × 29.7 cm）及默认页边距（上下各 2 cm，左右各 2 cm）估算。"
-    "生成后建议在 Word 中通过「审阅 → 字数统计 → 行数」进行最终复核。"
+    "生成的 Word 文档建议在 Word 中通过「审阅 → 字数统计 → 行数」进行最终复核，PDF 文档已按每页50行严格对齐。"
 )
 
 
@@ -259,6 +398,68 @@ def write_code_docx(
 
     path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(path))
+
+
+def write_code_pdf(
+    path: Path,
+    lines: list[SourceLine],
+    software_name: str,
+    version: str,
+    page_break_interval: int | None = LINES_PER_PAGE,
+) -> None:
+    """以精确符合软著申请规范的排版格式生成 PDF 文件。
+
+    - 标准 A4 尺寸，上下左右各 20mm 边距。
+    - 每页精确 50 行代码。
+    - 包含标准页眉（软件名称+版本号、当前页码）与居中页脚（第 X 页 / 共 Y 页）。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    font_name = get_registered_cjk_font()
+
+    c = canvas.Canvas(str(path), pagesize=A4)
+    page_width, page_height = A4
+    margin_left = 20 * mm
+    margin_top = 20 * mm
+    margin_bottom = 20 * mm
+    content_width = page_width - 2 * margin_left
+    content_height = page_height - margin_top - margin_bottom
+
+    interval = page_break_interval or LINES_PER_PAGE
+    total_pages = max(1, (len(lines) + interval - 1) // interval)
+
+    for page_idx in range(total_pages):
+        page_num = page_idx + 1
+
+        # 页眉
+        c.setFont(font_name, 9)
+        c.drawString(margin_left, page_height - 12 * mm, f"{software_name} {version}")
+        c.drawRightString(page_width - margin_left, page_height - 12 * mm, f"第 {page_num} 页")
+
+        # 页眉底部分隔线
+        c.setStrokeColorRGB(0.75, 0.75, 0.75)
+        c.setLineWidth(0.5)
+        c.line(margin_left, page_height - 15 * mm, page_width - margin_left, page_height - 15 * mm)
+
+        # 50 行代码
+        start_line = page_idx * interval
+        end_line = min(start_line + interval, len(lines))
+        page_lines = lines[start_line:end_line]
+
+        line_height = content_height / LINES_PER_PAGE
+        c.setFont(font_name, 9)
+
+        for line_idx, line in enumerate(page_lines):
+            y = page_height - margin_top - (line_idx + 0.8) * line_height
+            text = line.text if line.text else " "
+            c.drawString(margin_left, y, text)
+
+        # 页脚
+        c.setFont(font_name, 9)
+        c.drawCentredString(page_width / 2.0, 10 * mm, f"第 {page_num} 页 / 共 {total_pages} 页")
+
+        c.showPage()
+
+    c.save()
 
 
 def setup_document(doc: DocumentType, software_name: str, version: str) -> None:

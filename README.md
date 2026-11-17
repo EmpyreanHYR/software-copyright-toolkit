@@ -1,17 +1,19 @@
 # Software Copyright Toolkit
 
-**CLI/GUI 工具：统计代码行数并一键生成符合中国软著申请规范的程序鉴别材料 (Word)。**
+**CLI/GUI 工具：统计代码行数并一键生成符合中国软著申请规范的程序鉴别材料 (Word / PDF)。**
 
-统计指定文件夹内所有已适配代码文件的总行数、有效行数、空行数和注释行数，并在当前目录生成 Markdown 报告。同时支持生成软著申请所需的程序鉴别材料（前后 30 页合并 Word 文档）和全量代码 Word 文档。
+统计指定文件夹内所有已适配代码文件的总行数、有效行数、空行数和注释行数，并在当前目录生成 Markdown 报告。同时支持一键生成软著申请所需的程序鉴别材料（前后连续页合并 Word/PDF 文档）和全量代码 Word/PDF 文档。
 
 ## 功能概览
 
 - 📊 **代码行数统计** — 自动识别 40+ 种编程语言的注释语法，精确统计有效代码行
 - 📝 **Markdown 报告** — 生成包含汇总和每个文件明细的可读报告
-- 📄 **程序鉴别材料** — 一键生成符合软著申请规范的 Word 文档
-- 🖥️ **图形界面** — 直观的 GUI，无需记忆命令行参数
+- 📄 **程序鉴别材料 (Word & PDF)** — 一键生成符合软著申请规范的 Word 及高精度 PDF 文档
+- 📕 **原生 PDF 高精度排版** — 基于纯 Python 引擎（ReportLab），严格单页 50 行对齐、规范页眉页脚，不依赖 Office/WPS
+- 🎲 **固定随机种子代码打乱** — 支持通过随机种子在内存中确定性打乱文件拼接顺序，100% 不修改磁盘源文件，功能完全正常
+- 🖥️ **图形界面** — 直观的 GUI，无需记忆命令行参数，支持格式勾选、种子随机生成
 - 📂 **文件选择器** — 可视化树形勾选界面，精确控制纳入统计的文件和文件夹
-- 🔧 **高度可定制** — 自定义文件分隔符、输出目录等
+- 🔧 **高度可定制** — 自定义单段页数（30/60页）、文件分隔符、输出目录等
 - 🧩 **插件化语言扩展** — 通过 TOML 配置文件添加自定义语言的注释规则
 - 🦀 **嵌套块注释** — 支持 Rust 等语言的嵌套 `/* /* */ */` 语法
 
@@ -34,14 +36,11 @@
 | 🔄 **灵活可扩展** | 完美支持“软件使用说明书”与“软件设计文档”等多种软著必要文档的模板切换与定制 |
 
 > **💡 最佳实践工作流**：  
-> 1. 使用本 [software-copyright-toolkit](https://github.com/EmpyreanHYR/software-copyright-toolkit) 一键统计代码并生成符合规范的“源代码前后 30 页” Word 文档。  
+> 1. 使用本 [software-copyright-toolkit](https://github.com/EmpyreanHYR/software-copyright-toolkit) 一键统计代码并生成符合规范的“源代码前后 30 页” Word/PDF 文档。  
 > 2. 使用配套 [LaTeX 模板](https://github.com/EmpyreanHYR/copyright-of-computer-software_latex_template) 填写并编译生成专业的软件使用说明书 PDF。  
 > 3. 合并导出，轻松、专业地完成软著登记全套材料准备！
 
 ---
-
-
-
 
 ## 目录
 
@@ -95,7 +94,7 @@ uv --version
 > **⚠️ 网络问题？** 如果 `astral.sh` 无法访问（常见于国内部分网络环境），可以：
 > 1. 使用代理或 VPN
 > 2. 手动安装 uv：参考 [官方安装指南](https://docs.astral.sh/uv/getting-started/installation/)
-> 3. 使用备用方案：`pip install python-docx`，然后 `python -m software_copyright_toolkit.gui`
+> 3. 使用备用方案：`pip install python-docx reportlab`，然后 `python -m software_copyright_toolkit.gui`
 
 ## 2. 进入项目目录
 
@@ -121,7 +120,7 @@ cd ~/count-code
 uv sync
 ```
 
-这会自动创建 `.venv` 虚拟环境，并安装本工具的命令入口。
+这会自动创建 `.venv` 虚拟环境，并安装本工具的命令入口及所需依赖。
 
 如果需要增强的编码自动检测能力（推荐用于包含多种编码的遗留项目），可以安装可选依赖：
 
@@ -151,35 +150,79 @@ uv run count-code "/path/to/your/folder"
 
 ## 5. 命令行生成软著材料
 
-如果希望在命令行中同时生成代码行数统计、程序鉴别材料 Word、全量代码 Word，可以执行：
+如果希望在命令行中同时生成代码行数统计、程序鉴别材料（Word/PDF）、全量代码（Word/PDF），可以执行：
 
-Windows PowerShell:
-
-```powershell
-uv run sct-cli "D:\path\to\your\folder" --generate-docx --software-name "软件名称" --software-version "V1.0"
-```
-
-Linux / macOS:
+### 导出 Word + PDF 格式材料
 
 ```bash
-uv run sct-cli "/path/to/your/folder" --generate-docx --software-name "软件名称" --software-version "V1.0"
+uv run sct-cli "/path/to/your/folder" \
+  --software-name "软件名称" \
+  --software-version "V1.0" \
+  --generate-docx \
+  --generate-pdf
 ```
 
-指定输出目录：
+### 使用随机种子打乱文件拼接顺序（固定可复现）
 
 ```bash
-uv run sct-cli "/path/to/your/folder" --output-dir "/path/to/reports" --generate-docx --software-name "软件名称" --software-version "V1.0"
+uv run sct-cli "/path/to/your/folder" \
+  --software-name "软件名称" \
+  --software-version "V1.0" \
+  --generate-pdf \
+  --seed 42
 ```
 
-命令行会生成：
+> **提示**：`--seed` 仅在内存中打乱文件先后组织顺序，**绝对不修改磁盘上的源代码**，项目功能 100% 正常。
 
-- `目标文件夹名.md`
-- `软件名称_版本号_程序鉴别材料_前后30页.docx`
-- `软件名称_版本号_程序鉴别材料_全量代码.docx`
+### 自定义鉴别材料单段页数（如前后各 60 页）
+
+```bash
+uv run sct-cli "/path/to/your/folder" \
+  --software-name "软件名称" \
+  --software-version "V1.0" \
+  --generate-pdf \
+  --pages 60
+```
+
+### 指定输出目录
+
+```bash
+uv run sct-cli "/path/to/your/folder" \
+  --output-dir "/path/to/reports" \
+  --software-name "软件名称" \
+  --software-version "V1.0" \
+  --generate-docx \
+  --generate-pdf
+```
+
+命令行输出文件包含：
+
+- `软件名称_版本号_代码行数统计.md`
+- `软件名称_版本号_程序鉴别材料_前后30页.docx` (若开启 `--generate-docx`)
+- `软件名称_版本号_程序鉴别材料_全量代码.docx` (若开启 `--generate-docx`)
+- `软件名称_版本号_程序鉴别材料_前后30页.pdf` (若开启 `--generate-pdf`)
+- `软件名称_版本号_程序鉴别材料_全量代码.pdf` (若开启 `--generate-pdf`)
+
+### CLI 参数速查表
+
+| 参数 | 说明 | 默认值 |
+| :--- | :--- | :--- |
+| `folder` | 要统计或处理的目标源代码文件夹路径 | （必填） |
+| `--output-dir` | 输出目录 | 当前目录 |
+| `--software-name` | 软件名称（生成 Word/PDF 材料时必填） | 无 |
+| `--software-version` / `--version` | 软件版本号 | `V1.0` |
+| `--generate-docx` | 导出 Word (`.docx`) 格式材料 | `False` |
+| `--generate-pdf` | 导出 PDF (`.pdf`) 格式材料 | `False` |
+| `--seed` | 整数随机种子，用于固定打乱文件拼接顺序 | 无（默认字典序） |
+| `--pages` | 鉴别材料单段页数（30 即前后各 30 页共 60 页；60 即前后各 60 页） | `30` |
+| `--separator` | 文件分隔符模板，`{path}` 为相对路径 | `===== 文件: {path} =====` |
+| `--use-streaming` | 流式读取模式，适合超大文件降低内存占用 | `False` |
+
+---
 
 ## 6. 打开图形界面
 
-如果需要生成软著申请用的程序鉴别材料，运行：
+如果需要直观地进行文件勾选、参数设置与生成材料，运行：
 
 ```bash
 uv run sct-gui
@@ -195,16 +238,10 @@ uv run sct-gui
 
 也可以手动在终端运行：
 
-Windows:
+Windows PowerShell:
 
 ```powershell
 .\launchers\open-gui.bat
-```
-
-PowerShell:
-
-```powershell
-.\launchers\open-gui.ps1
 ```
 
 Linux:
@@ -219,38 +256,16 @@ macOS:
 sh ./launchers/open-gui.command
 ```
 
-启动脚本会自动定位项目目录，检查本机是否安装 `uv`。如果没有安装，会先询问是否安装；选择拒绝会直接退出并给出备用安装提示。检测到 `uv` 后，会使用清华源执行依赖同步：
+### 图形界面功能一览
 
-```bash
-uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple
-```
-
-如果清华源不可用，脚本会自动回退到默认源。
-
-依赖环境准备完成后，会自动打开 GUI。
-
-界面支持：
-
-- 选择目标代码文件夹
-- **文件选择器** — 选择文件夹后，点击「选择文件...」打开树形勾选界面，可视化筛选要纳入统计的子文件夹和文件
-  - 支持全选/取消全选/展开全部/折叠全部
-  - 父子联动：勾选父节点自动全选子节点
-  - 展开/折叠与勾选操作分离，互不干扰
-  - 每个节点显示 ☑（绿色）/ ☐（灰色）/ ☒（黄色）勾选状态
-- 选择输出目录
-- 输入软件名称
-- 输入版本号
-- 自定义文件分隔符模板（例如改为 `// --- File: {path} ---`）
-- 可选生成代码行数统计 Markdown
-- 可选生成程序鉴别材料 Word
-- 可选生成全量代码 Word
-
-程序鉴别材料 Word 使用 Arial 字体、10 号字，左页眉为软件名称和版本号，右页眉为页码，页脚居中为"当前页 / 总页数"。
-
-生成的 Word 文件包括：
-
-- `软件名称_版本号_程序鉴别材料_前后30页.docx`
-- `软件名称_版本号_程序鉴别材料_全量代码.docx`
+- 📂 **选择目标文件夹** — 自动记忆与智能匹配输出目录
+- 🌲 **文件选择器** — 点击「选择文件...」打开树形勾选界面，精细控制纳入统计的子文件夹和文件
+- 🏷️ **软件名称与版本号** — 自动填入页眉、封面与文件名前缀
+- 📄 **单段页数设置** — 下拉选择 `30` 页（默认前后各 30 页，共 60 页）或 `60` 页
+- 🎲 **随机种子打乱** — 支持手动输入种子或点击「随机生成」，以固定种子打乱文件排版顺序（不修改磁盘源码）
+- 🔧 **自定义文件分隔符** — 自定义各源码文件之间的隔离行标记
+- 📑 **输出格式多选** — 支持独立或同时勾选导出 **Word (.docx)** 与 **PDF (.pdf)**
+- 📋 **材料内容多选** — 自由勾选生成“程序鉴别材料”、“全量代码”、“代码行数统计 Markdown”
 
 ---
 
@@ -291,37 +306,36 @@ Markdown 报告包含：
 
 ## 程序鉴别材料生成规则
 
-这是本工具最核心的业务逻辑，请仔细阅读。
+### 前后连续页截取逻辑
 
-### 前后 30 页截取逻辑
+根据中国版权保护中心（CPCC）《计算机软件著作权登记办法》规范：
 
-> **当有效代码行数 + 注释行数 ≥ 3000 行时：**
->
-> 1. 程序鉴别材料按每页 **50 个可见行位** 生成完整 **60 页**（前 30 页 + 后 30 页）。
-> 2. 保留前 **1500 个可见行位**（前 30 页）。
-> 3. 再从不与前 1500 个可见行位重叠的后方范围寻找一个**模块结束行**作为第 3000 个可见行位。
-> 4. 取该结束行之前的 **1500 个可见行位** 作为后 30 页，中间代码会被删除。
-> 5. 分页符附在每页最后一个可见行位末尾。
->
-> **当有效代码行数 + 注释行数 < 3000 行时：**
->
-> 程序鉴别材料直接使用全量源码内容，不进行截取。
+> 源程序鉴别材料应当由源程序的前、后各连续的 30 页组成，共 60 页。整个程序不到 60 页的，应当提交全部源程序。
 
-### 可见行估算机制
+1. **当代码总可见行数 ≥ 规范行数（3000 行 / 60 页）时：**
+   - 提取前半部分：严格保留前 **1500 行**（第 1~30 页）。
+   - 提取后半部分：从代码后方匹配模块结束标记（如 `}`、`end` 或 Python 模块边界）作为结束点，向前截取 **1500 行**（第 31~60 页），中间代码安全省略。
+2. **当代码总可见行数 < 规范行数时：**
+   - 程序鉴别材料直接包含全部源代码，不进行多余截断。
 
-> **默认最大显示宽度为 80**（英文半角字符宽度），中文/全角字符按 2 倍宽度处理。
->
-> - 超长代码行会按显示宽度拆成多个 Word 可见行，避免代码超出页边距。
-> - 续行会占用页内行位，但**不会重复计入**有效代码行 + 注释行。
-> - 文件分隔行也会占用可见行位，以保证页数稳定。
->
-> 为了保证 Word 正好 60 页，文件分隔行和超长代码拆出的续行都会计入 3000 个可见行位。因此程序鉴别材料中的有效代码行 + 注释行可能略少于 3000。
+### 可见行与排版机制
 
-> **⚠️ 重要提示**：页数基于标准 A4 纸张（21 cm × 29.7 cm）及默认页边距（上下各 2 cm，左右各 2 cm）估算。生成后建议在 Word 中通过 **「审阅 → 字数统计 → 行数」** 进行最终复核。实际渲染效果可能因字体版本、打印机驱动等因素略有差异。
+- **最大显示宽度限制**：默认单行宽度为 80（英文字符），全角中文字符按 2 倍宽度计算，超长行自动折行。
+- **PDF 高精度排版优势**：
+  - 标准 A4 尺寸，上下左右各 20mm 边距；
+  - 严格单页 50 行物理对齐，字号与行距严整；
+  - 页眉：左侧「软件名称 版本号」，右侧「第 X 页」，带 0.5pt 分隔线；
+  - 页脚：居中「第 X 页 / 共 Y 页」；
+  - 自动识别并加载系统等宽中文字体（SimSun、微软雅黑等），杜绝乱码。
 
 ---
 
 ## 高级选项
+
+### 随机种子打乱（代码顺序混淆）
+
+- **原理**：在文件级别打乱拼接顺序。用户本地工程源码文件**不作任何变动**，项目运行、开发、测试不受影响。
+- **可复现性**：使用确定性随机数生成算法，相同 seed 每次生成的输出文件完全一致；更换 seed 即获得一套全新文件次序。
 
 ### 自定义语言配置（插件化扩展）
 
@@ -351,44 +365,6 @@ block_comment_nesting = [true, false]
 
 Rust 等语言支持嵌套块注释语法 `/* /* inner */ outer */`。工具会自动识别 Rust（`.rs`）的嵌套注释，无需额外配置。
 
-对于其他支持嵌套注释的自定义语言，在配置文件中设置 `block_comment_nesting = [true]` 即可。
-
-### 页数不足警告
-
-CLI 和 GUI 在生成程序鉴别材料时，如果估算页数不足 60 页，会自动输出警告提示，帮助用户及时调整。
-
-### 自定义文件分隔符
-
-默认文件分隔符为 `===== 文件: {path} =====`，其中 `{path}` 会被替换为文件相对路径。
-
-你可以自定义分隔符样式以节省"可见行"额度，例如使用更隐蔽的注释形式：
-
-**CLI:**
-
-```bash
-uv run sct-cli "/path/to/folder" --generate-docx \
-  --software-name "MyApp" \
-  --separator "// --- File: {path} ---"
-```
-
-**GUI:** 在界面的"文件分隔符"输入框中直接修改模板。
-
-### 大文件流式读取
-
-对于包含大型生成文件的项目，可以使用流式读取模式降低内存占用：
-
-```bash
-uv run count-code "/path/to/folder" --use-streaming
-```
-
-### 编码自动检测
-
-安装可选依赖后自动启用增强编码检测（适合包含 GBK/Shift-JIS 等遗留编码的混合项目）：
-
-```bash
-uv sync --extra charset-normalizer
-```
-
 ---
 
 ## 常见问题
@@ -403,39 +379,13 @@ uv --version
 
 如果仍然无法识别，说明安装目录还没有加入 `PATH`。
 
-Linux / macOS 通常可以尝试：
+### 导出 PDF 时中文字体如何处理？
 
-```bash
-source ~/.bashrc
-```
-
-或：
-
-```bash
-source ~/.zshrc
-```
-
-Windows 可以重启 PowerShell 或重启电脑后再试。
-
-### 统计结果里出现未统计文件
-
-这是正常的容错机制。工具只会统计已经适配过注释规则的文件格式；如果遇到未知后缀，会在报告末尾列出，避免把未知格式当作代码乱算。
-
-### 想重新生成报告
-
-直接重新运行统计命令即可，同名 `.md` 报告会被覆盖更新。
-
-### 安装 uv 时网络失败
-
-启动脚本已内置超时处理和备用方案提示。如果安装脚本失败：
-
-1. 检查网络连接和代理设置
-2. 手动从 [astral.sh](https://docs.astral.sh/uv/getting-started/installation/) 下载安装
-3. 使用备用方案（需要已安装 Python）：
-   ```bash
-   pip install python-docx
-   python -m software_copyright_toolkit.gui
-   ```
+工具内置了全平台中文字体自适应探测引擎：
+- **Windows**: 优先加载 `SimSun`（宋体）或 `msyh`（微软雅黑）；
+- **macOS**: 优先加载 `PingFang` 或 `Songti`；
+- **Linux**: 优先加载 `NotoSansCJK` 或 `wqy-zenhei`。
+无需用户额外下载或配置字体文件。
 
 ---
 
@@ -450,26 +400,7 @@ uv sync --extra dev
 ### 运行测试
 
 ```bash
-uv run pytest tests/ -v
-```
-
-附带覆盖率报告：
-
-```bash
-uv run pytest tests/ -v --cov=software_copyright_toolkit --cov-report=term-missing
-```
-
-### 代码质量
-
-```bash
-# 格式化
-uv run ruff format .
-
-# 代码检查
-uv run ruff check .
-
-# 类型检查
-uv run mypy src/
+uv run pytest
 ```
 
 ### 打包为独立可执行文件
@@ -477,10 +408,6 @@ uv run mypy src/
 ```bash
 uv run python build_installer.py --all
 ```
-
-打包后的文件在 `dist/` 目录下：
-- `sct-cli` / `sct-cli.exe` — 命令行工具
-- `sct-gui` / `sct-gui.exe` — 图形界面工具
 
 ### 项目结构
 
@@ -493,7 +420,7 @@ src/software_copyright_toolkit/
 ├── cli.py           # CLI 参数解析和入口调度
 ├── controller.py    # 业务逻辑控制器（GUI/CLI 共享）
 ├── report.py        # Markdown 报告生成
-├── documents.py     # Word 程序鉴别材料生成
+├── documents.py     # Word & PDF 程序鉴别材料生成（ReportLab 引擎）
 ├── file_selector.py # 文件树选择对话框组件
 └── gui.py           # Tkinter 图形界面
 ```

@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+.pytest_temp/
 .mypy_cache/
 .ruff_cache/
 
@@ -28,5 +29,6 @@ Thumbs.db
 /.tmp-*/
 /*.md
 /*.docx
+/*.pdf
 !/README.md
 reasonix.toml
