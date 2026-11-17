@@ -1,6 +1,6 @@
 [project]
 name = "software-copyright-toolkit"
-version = "0.2.0"
+version = "0.2.1"
 description = "CLI/GUI 工具：统计代码行数并一键生成符合中国软著申请规范的程序鉴别材料 (Word/PDF)。"
 readme = "README.md"
 requires-python = ">=3.10"
