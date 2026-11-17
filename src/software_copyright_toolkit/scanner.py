@@ -37,13 +37,16 @@ _DEFAULT_ENCODINGS = ("utf-8-sig", "utf-8", "gb18030", "utf-16")
 def _try_charset_normalizer(raw: bytes) -> str | None:
     """尝试使用 charset-normalizer 自动检测编码（可选依赖）。"""
     try:
-        from charset_normalizer import from_bytes  # type: ignore[import-not-found]
+        from charset_normalizer import from_bytes  # type: ignore[import-not-found,unused-ignore]
     except ImportError:
         return None
 
     matches = from_bytes(raw)
     if matches:
-        return str(matches.best().first() if hasattr(matches.best(), "first") else matches.best())
+        best = matches.best()
+        if best is not None:
+            first_fn = getattr(best, "first", None)
+            return str(first_fn() if callable(first_fn) else best)
     return None
 
 

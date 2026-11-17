@@ -405,9 +405,47 @@ uv run pytest
 
 ### 打包为独立可执行文件
 
+**1. 本地打包：**
+
 ```bash
+# 同时打包 CLI 和 GUI（产物在 dist/ 目录下）
 uv run python build_installer.py --all
+
+# 也可指定版本后缀（如 sct-cli-v0.2.0.exe）
+uv run python build_installer.py --all --suffix v0.2.0
+
+# 仅打包 CLI 或 GUI
+uv run python build_installer.py --cli
+uv run python build_installer.py --gui
 ```
+
+**2. CI/CD 自动构建与发布（GitHub Releases）：**
+
+项目已配置 GitHub Actions 自动化工作流（`.github/workflows/release.yml`）。当您为提交打上版本 Tag 并推送至 GitHub 时，将自动执行以下流程：
+
+- **自动化测试**：运行完整的单元测试套件（`pytest`），确保版本质量；
+- **Windows 构建**：基于 PyInstaller 编译无依赖的单文件独立运行程序：
+  - `sct-cli-<tag>.exe`：命令行工具（支持批处理与终端调用）
+  - `sct-gui-<tag>.exe`：图形界面工具（无黑框控制台直接启动）
+- **安全校验**：自动计算二进制产物的 SHA-256 哈希值生成 `checksums-sha256.txt`；
+- **发布 Release**：自动创建对应的 GitHub Release、生成变更日志，并将 `.exe` 和校验文件发布到 Release 页面供用户直接下载。
+
+**发布操作步骤：**
+
+```bash
+# 步骤 1: 提交所有工作区代码并推送到主分支
+git add .
+git commit -m "chore: release v0.2.1"
+git push origin main
+
+# 步骤 2: 为当前 commit 创建版本 Tag（以 v 开头，例如 v0.2.1）
+git tag v0.2.1
+
+# 步骤 3: 推送 Tag 到 GitHub 触发自动发布
+git push origin v0.2.1
+```
+
+> **提示**：除了打 Tag 触发，也可以在 GitHub 仓库页面的 **Actions** -> **Build Release Binaries** -> **Run workflow** 手动触发构建，构建成功后可在 Actions 产物（Artifacts）中直接下载测试二进制文件。
 
 ### 项目结构
 

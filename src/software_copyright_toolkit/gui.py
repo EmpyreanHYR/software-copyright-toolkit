@@ -153,9 +153,7 @@ class ToolkitApp(tk.Tk):
         ttk.Checkbutton(fmt_frame, text="Word (.docx)", variable=self.generate_docx_var).grid(
             row=0, column=0, sticky="w", padx=(0, 20)
         )
-        ttk.Checkbutton(fmt_frame, text="PDF (.pdf)", variable=self.generate_pdf_var).grid(
-            row=0, column=1, sticky="w"
-        )
+        ttk.Checkbutton(fmt_frame, text="PDF (.pdf)", variable=self.generate_pdf_var).grid(row=0, column=1, sticky="w")
 
         # 9. 按钮
         actions = ttk.Frame(root)

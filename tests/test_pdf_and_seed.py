@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from software_copyright_toolkit.controller import TaskConfig, run_generation, validate_task_config
 from software_copyright_toolkit.documents import (
     FRONT_BACK_PAGES,
@@ -62,7 +60,9 @@ class TestWriteCodePdf:
     """测试 PDF 排版与生成。"""
 
     def test_pdf_generation_basic(self, tmp_path: Path):
-        lines = [SourceLine(f"print('Hello world {i}')", counts_as_source=True, is_source_text=True) for i in range(120)]
+        lines = [
+            SourceLine(f"print('Hello world {i}')", counts_as_source=True, is_source_text=True) for i in range(120)
+        ]
         pdf_path = tmp_path / "output.pdf"
 
         write_code_pdf(pdf_path, lines, software_name="测试系统", version="V1.0.0")

@@ -199,7 +199,9 @@ def generate_identification_documents(
     prefix = f"{name_part}_{version_part}_程序鉴别材料"
     page_tag = f"前后{front_back_pages}页"
 
-    identification_docx = output_dir / f"{prefix}_{page_tag}.docx" if (include_identification and generate_docx) else None
+    identification_docx = (
+        output_dir / f"{prefix}_{page_tag}.docx" if (include_identification and generate_docx) else None
+    )
     full_docx = output_dir / f"{prefix}_全量代码.docx" if (include_full and generate_docx) else None
     identification_pdf = output_dir / f"{prefix}_{page_tag}.pdf" if (include_identification and generate_pdf) else None
     full_pdf = output_dir / f"{prefix}_全量代码.pdf" if (include_full and generate_pdf) else None
@@ -355,10 +357,14 @@ def find_graceful_end_index(lines: list[SourceLine], minimum_index: int) -> int:
     """
     for index in range(len(lines), minimum_index - 1, -1):
         line = lines[index - 1]
-        if line.is_source_text and line.text.strip():
-            # 顶格语句通常是一个模块或顶层函数/调用的结束边界
-            if not line.text.startswith(" ") and not line.text.startswith("\t"):
-                return index
+        # 顶格语句通常是一个模块或顶层函数/调用的结束边界
+        if (
+            line.is_source_text
+            and line.text.strip()
+            and not line.text.startswith(" ")
+            and not line.text.startswith("\t")
+        ):
+            return index
     return len(lines)
 
 
@@ -366,7 +372,9 @@ def is_module_end_line(line: str) -> bool:
     return any(pattern.match(line) for pattern in MODULE_END_PATTERNS)
 
 
-def is_valid_identification_selection(lines: list[SourceLine], expected_lines: int = IDENTIFICATION_TOTAL_LINES) -> bool:
+def is_valid_identification_selection(
+    lines: list[SourceLine], expected_lines: int = IDENTIFICATION_TOTAL_LINES
+) -> bool:
     return len(lines) == expected_lines and lines[-1].is_source_text and is_module_end_line(lines[-1].text)
 
 
@@ -421,7 +429,6 @@ def write_code_pdf(
     margin_left = 20 * mm
     margin_top = 20 * mm
     margin_bottom = 20 * mm
-    content_width = page_width - 2 * margin_left
     content_height = page_height - margin_top - margin_bottom
 
     interval = page_break_interval or LINES_PER_PAGE
